@@ -57,6 +57,12 @@ inline bool CsvParser<T>::Parse(sp<lib_data::MlDataFrame<T>> data, Ts& stream) {
   att_ids.assign(attributes.size(), 0);
   samples.assign(attributes.size() - 1, col_array<T>());
 
+  auto target_id = attributes.size() - 1;
+  for (int i = 0; i < attributes.size(); ++i)
+    if (attributes[i].compare("class") || attributes[i].compare("target") ||
+        attributes[i].compare("output"))
+      target_id = i;
+
   T value;
   string part;
   do {
@@ -72,15 +78,17 @@ inline bool CsvParser<T>::Parse(sp<lib_data::MlDataFrame<T>> data, Ts& stream) {
       pstream >> value;
 
       if (pstream.fail()) {
-        if (att_col_map.find(part) == att_col_map.end())
-          att_col_map[part] = att_ids[att_id]++;
+        if (att_col_map.find(part) == att_col_map.end()) {
+          att_col_map[part] = att_ids[att_id];
+          ++att_ids[att_id];
+        }
 
         value = att_col_map[part];
       } else
         att_col_map[part] = value;
 
-      if (att_id == attributes.size() - 1)
-        targets.emplace_back(value);
+	  if (att_id == target_id)
+		  targets.emplace_back(value);
       else
         samples[att_id].emplace_back(value);
 

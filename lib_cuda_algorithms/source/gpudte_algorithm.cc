@@ -5,12 +5,11 @@
 #include <cassert>
 #include "gpudte_algorithm.h"
 #include "lib_core.h"
-#include "lib_ensembles.h"
 #include "lib_gpu.h"
 
 #include "gpudte.h"
 
-namespace lib_ensembles {
+namespace lib_cuda_algorithms {
 template <typename T>
 sp<lib_models::MlModel> GpuDteAlgorithm<T>::Fit(
     sp<lib_data::MlDataFrame<T>> data,
@@ -19,19 +18,21 @@ sp<lib_models::MlModel> GpuDteAlgorithm<T>::Fit(
   GpuDteAlgorithmShared::gpuDTE_DatasetInfo dataset_info;
   GpuDteAlgorithmShared::gpuDTE_IterationInfo iteration_info;
   auto device = GpuLib::GetInstance().CreateGpuDevice(
-      params->Get<int>(EnsemblesLib::kDevId));
+      params->Get<int>(AlgorithmsLib::kDevId));
   auto gpu_params = GpuDteAlgorithmShared::GpuParams<T>();
-  auto nr_total_trees = params->Get<int>(EnsemblesLib::kNrTrees);
   auto algo_type =
-      params->Get<AlgorithmsLib::AlgorithmType>(EnsemblesLib::kAlgoType);
+      params->Get<AlgorithmsLib::AlgorithmType>(AlgorithmsLib::kAlgoType);
+  auto batch_size = params->Get<int>(AlgorithmsLib::kTreeBatchSize);
   auto nr_samples = data->GetNrSamples();
   auto nr_features = data->GetNrFeatures();
   auto nr_targets = data->GetNrTargets();
   int trees_built = 0;
 
+  auto decorator = ModelsLib::GetInstance().CreateDteModelDecorator<T>();
   col_array<sp<lib_models::MlModel>> models;
-  GpuDteAlgorithmShared::gpuDTE_NodeHeader_Classify<T> tmp_node;
-  col_array<col_array<GpuDteAlgorithmShared::gpuDTE_NodeHeader_Classify<T>>>
+  lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Classify<T> tmp_node;
+  col_array<
+      col_array<lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Classify<T>>>
       tree_nodes;
   col_array<col_array<T>> tree_probabilities;
   HostAllocFit host_alloc(device, nr_targets);
@@ -40,7 +41,8 @@ sp<lib_models::MlModel> GpuDteAlgorithm<T>::Fit(
   // bool run_rec_func = true;
   sutil::LockFreeList<std::pair<int, int>> job_list;
   col_map<int, int> track_map;
-  int node_size = sizeof(GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T>);
+  int node_size =
+      sizeof(lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>);
   int type_size = sizeof(T);
   int prob_id = 0;
   auto data_rec_func = [&]() {
@@ -96,174 +98,210 @@ sp<lib_models::MlModel> GpuDteAlgorithm<T>::Fit(
   AllocateFit(device, params, &gpu_params, data, static_info, dataset_info,
               iteration_info);
 
-  col_array<col_array<GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T>>>
+  col_array<
+      col_array<lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>>>
       node_cache(
-          2, col_array<GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T>>());
+          2,
+          col_array<
+              lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>>());
   int nodes_pulled = 0;
   int stream_buffer = 2;
-  int trees_left = nr_total_trees;
-  while (trees_left > 0) {
-    tree_probabilities.emplace_back(col_array<T>());
-    tree_nodes.emplace_back(
-        col_array<GpuDteAlgorithmShared::gpuDTE_NodeHeader_Classify<T>>());
-    stream_buffer = 2;
-    iteration_info.depth = 0;
-    iteration_info.read_buffer_id = 0;
-    iteration_info.write_buffer_id = 1;
-    iteration_info.prob_buffer_id = 0;
-    iteration_info.tick_tock = true;
+  int trees_left = 0;
+  int batch = 0;
 
-    int trees_launched =
-        trees_left > max_tree_batch_ ? max_tree_batch_ : trees_left;
-    trees_left -= trees_launched;
-    models.emplace_back(ModelsLib::GetInstance().CreateModel());
-    models.back()->Add(ModelsLib::kNrTrees, trees_launched);
-    models.back()->Add(ModelsLib::kNrFeatures, nr_features);
-    models.back()->Add(ModelsLib::kNrTargets, nr_targets);
-    models.back()->Add(ModelsLib::kModelType, algo_type);
+  auto tree_id_counter = params->Get<sp<int>>(AlgorithmsLib::kTreeCounter);
+  auto tree_id_counter_mutex =
+      params->Get<sp<mutex>>(AlgorithmsLib::kTreeCounterMutex);
 
-    int nodes_left = trees_launched;
-    int layer_id = 0;
-    col_array<int> buffer_counts(3, 0);
-    buffer_counts[iteration_info.read_buffer_id] = nodes_left;
+  while (true) {
+    {
+      mutex_lock(tree_id_counter_mutex);
+      trees_left = *tree_id_counter;
+      if (trees_left <= 0) break;
+      if (trees_left > batch_size) {
+        batch = batch_size;
+        *tree_id_counter -= batch_size;
+      } else {
+        batch = trees_left;
+        *tree_id_counter = 0;
+      }
+    }
 
-    iteration_info.threads_launched = max_blocks_ * block_size_;
-    gpu_functions_->CopyIterationInfo(iteration_info);
-    device->SynchronizeDevice();
-    gpu_functions_->CallCudaKernel(max_blocks_ / block_size_, block_size_,
-                                   gpu_params,
-                                   GpuDteAlgorithmShared::kSetupKernel);
-    device->SynchronizeDevice();
+    while (batch > 0) {
+      tree_probabilities.emplace_back(col_array<T>());
+      tree_nodes.emplace_back(
+          col_array<lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Classify<
+              T>>());
+      stream_buffer = 2;
+      iteration_info.depth = 0;
+      iteration_info.read_buffer_id = 0;
+      iteration_info.write_buffer_id = 1;
+      iteration_info.prob_buffer_id = 0;
+      iteration_info.tick_tock = true;
 
-    iteration_info.threads_launched = trees_launched;
-    gpu_functions_->CopyIterationInfo(iteration_info);
-    gpu_functions_->CallCudaKernel(trees_launched, block_size_, gpu_params,
-                                   GpuDteAlgorithmShared::kInitTreeBatch);
-    device->SynchronizeDevice();
+      int trees_launched = batch > max_tree_batch_ ? max_tree_batch_ : batch;
+      batch -= trees_launched;
+      models.emplace_back(ModelsLib::GetInstance().CreateModel(decorator));
+      models.back()->Add(ModelsLib::kNrTrees, trees_launched);
+      models.back()->Add(ModelsLib::kNrFeatures, nr_features);
+      models.back()->Add(ModelsLib::kNrTargets, nr_targets);
+      models.back()->Add(ModelsLib::kModelType, algo_type);
 
-    // Build trees
-    do {
-      bool swap_next = false;
-      // Build node layer
+      int nodes_left = trees_launched;
+      int layer_id = 0;
+      col_array<int> buffer_counts(3, 0);
+      buffer_counts[iteration_info.read_buffer_id] = nodes_left;
+
+      iteration_info.threads_launched = max_blocks_ * block_size_;
+      gpu_functions_->CopyIterationInfo(iteration_info);
+      device->SynchronizeDevice();
+      gpu_functions_->CallCudaKernel(max_blocks_ / block_size_, block_size_,
+                                     gpu_params,
+                                     GpuDteAlgorithmShared::kSetupKernel);
+      device->SynchronizeDevice();
+
+      iteration_info.threads_launched = trees_launched;
+      gpu_functions_->CopyIterationInfo(iteration_info);
+      gpu_functions_->CallCudaKernel(trees_launched, block_size_, gpu_params,
+                                     GpuDteAlgorithmShared::kInitTreeBatch);
+      device->SynchronizeDevice();
+
+      // Build trees
       do {
-        int nodes_launched = nodes_left > max_blocks_ / max_nominal_
-                                 ? max_blocks_ / max_nominal_
-                                 : nodes_left;
+        bool swap_next = false;
+        // Build node layer
+        do {
+          int nodes_launched = nodes_left > max_blocks_ / max_nominal_
+                                   ? max_blocks_ / max_nominal_
+                                   : nodes_left;
 
-        nodes_left -= nodes_launched;
-        iteration_info.threads_launched = nodes_launched;
-        gpu_functions_->CopyIterationInfo(iteration_info);
-        // cpy_iteration_info(&iteration_info);
+          nodes_left -= nodes_launched;
+          iteration_info.threads_launched = nodes_launched;
+          gpu_functions_->CopyIterationInfo(iteration_info);
 
-        gpu_functions_->CallCudaKernel(nodes_launched, block_size_, gpu_params,
-                                       GpuDteAlgorithmShared::kFindSplit);
-        device->SynchronizeDevice();
-        gpu_functions_->CallCudaKernel(nodes_launched, block_size_, gpu_params,
-                                       GpuDteAlgorithmShared::kPerformSplit);
-        device->SynchronizeDevice();
-        device->CopyToHost(host_alloc.node_cursor_cpy, gpu_params.node_cursors,
-                           sizeof(int) * 3);
-        device->SynchronizeDevice();
-
-        iteration_info.node_offset += nodes_launched;
-        buffer_counts[iteration_info.write_buffer_id] =
-            host_alloc.node_cursor_cpy[new_nodes_];
-
-        // Swap write buffer
-        if (swap_next) {
-          iteration_info.node_offset = 0;
-          SwapBuffers(&iteration_info.read_buffer_id, &stream_buffer);
-          swap_next = false;
-
-          // Stream partial layer results
-          iteration_info.prob_buffer_id =
-              iteration_info.prob_buffer_id == 0 ? 1 : 0;
-
-          job_list.push_front(
-              std::pair<int, int>(buffer_counts[stream_buffer], stream_buffer));
-          buffer_counts[stream_buffer] = 0;
-          data_rec_func();
-          // barrier->Wait();
-          nodes_left = nodes_pulled;
-        } else if (!node_cache[layer_id].empty() &&
-                   nodes_left - int(max_blocks_ / max_nominal_) <= 0) {
-          nodes_pulled = max_blocks_ > node_cache[layer_id].size()
-                             ? int(node_cache[layer_id].size())
-                             : max_blocks_;
-
-          // Pre-stream next layer chunk for next iteration
-          buffer_counts[stream_buffer] = nodes_pulled;
-          StreamFromCache(device, host_alloc, stream_buffer, layer_id,
-                          node_cache, buffer_counts,
-                          gpu_params.node_buffers[stream_buffer]);
-
-          if (buffer_counts[iteration_info.write_buffer_id] > 0)
-            StreamToCache(
-                device, host_alloc, iteration_info.write_buffer_id, layer_id,
-                node_cache, buffer_counts,
-                gpu_params.node_buffers[iteration_info.write_buffer_id]);
-
-          swap_next = true;
-        }
-
-        if (!swap_next) {
-          // Stream nodes to the cache
-          SwapBuffers(&iteration_info.write_buffer_id, &stream_buffer);
-
-          if (buffer_counts[stream_buffer] > 0)
-            StreamToCache(device, host_alloc, stream_buffer, layer_id,
-                          node_cache, buffer_counts,
-                          gpu_params.node_buffers[stream_buffer]);
-        }
-
-        // Update node counts on GPU
-        host_alloc.node_cursor_cpy[work_cursor_] =
-            host_alloc.node_cursor_cpy[new_nodes_] = 0;
-        device->CopyToDevice(host_alloc.node_cursor_cpy,
+          gpu_functions_->CallCudaKernel(nodes_launched, block_size_,
+                                         gpu_params,
+                                         GpuDteAlgorithmShared::kFindSplit);
+          device->SynchronizeDevice();
+          gpu_functions_->CallCudaKernel(nodes_launched, block_size_,
+                                         gpu_params,
+                                         GpuDteAlgorithmShared::kPerformSplit);
+          device->SynchronizeDevice();
+          device->CopyToHost(host_alloc.node_cursor_cpy,
                              gpu_params.node_cursors, sizeof(int) * 3);
-        device->SynchronizeDevice();
+          device->SynchronizeDevice();
+
+          iteration_info.node_offset += nodes_launched;
+          buffer_counts[iteration_info.write_buffer_id] =
+              host_alloc.node_cursor_cpy[new_nodes_];
+
+          // Swap write buffer
+          if (swap_next) {
+            iteration_info.node_offset = 0;
+            SwapBuffers(&iteration_info.read_buffer_id, &stream_buffer);
+            swap_next = false;
+
+            // Stream partial layer results
+            iteration_info.prob_buffer_id =
+                iteration_info.prob_buffer_id == 0 ? 1 : 0;
+
+            job_list.push_front(std::pair<int, int>(
+                buffer_counts[stream_buffer], stream_buffer));
+            buffer_counts[stream_buffer] = 0;
+            data_rec_func();
+            // barrier->Wait();
+            nodes_left = nodes_pulled;
+          } else if (!node_cache[layer_id].empty() &&
+                     nodes_left - int(max_blocks_ / max_nominal_) <= 0) {
+            nodes_pulled = max_blocks_ > node_cache[layer_id].size()
+                               ? int(node_cache[layer_id].size())
+                               : max_blocks_;
+
+            // Pre-stream next layer chunk for next iteration
+            buffer_counts[stream_buffer] = nodes_pulled;
+            StreamFromCache(device, host_alloc, stream_buffer, layer_id,
+                            node_cache, buffer_counts,
+                            gpu_params.node_buffers[stream_buffer]);
+
+            if (buffer_counts[iteration_info.write_buffer_id] > 0)
+              StreamToCache(
+                  device, host_alloc, iteration_info.write_buffer_id, layer_id,
+                  node_cache, buffer_counts,
+                  gpu_params.node_buffers[iteration_info.write_buffer_id]);
+
+            swap_next = true;
+          }
+
+          if (!swap_next) {
+            // Stream nodes to the cache
+            SwapBuffers(&iteration_info.write_buffer_id, &stream_buffer);
+
+            if (buffer_counts[stream_buffer] > 0)
+              StreamToCache(device, host_alloc, stream_buffer, layer_id,
+                            node_cache, buffer_counts,
+                            gpu_params.node_buffers[stream_buffer]);
+          }
+
+          // Update node counts on GPU
+          host_alloc.node_cursor_cpy[work_cursor_] =
+              host_alloc.node_cursor_cpy[new_nodes_] = 0;
+          device->CopyToDevice(host_alloc.node_cursor_cpy,
+                               gpu_params.node_cursors, sizeof(int) * 3);
+          device->SynchronizeDevice();
+        } while (nodes_left > 0);
+
+        // Stream the last layer results
+        iteration_info.prob_buffer_id =
+            iteration_info.prob_buffer_id == 0 ? 1 : 0;
+
+        job_list.push_front(
+            std::pair<int, int>(buffer_counts[iteration_info.read_buffer_id],
+                                iteration_info.read_buffer_id));
+        buffer_counts[iteration_info.read_buffer_id] = 0;
+        data_rec_func();
+        // barrier->Wait();
+
+        // Prepare next layer
+        layer_id = layer_id == 0 ? 1 : 0;
+        if (!node_cache[layer_id].empty()) {
+          nodes_left = max_blocks_ < node_cache[layer_id].size()
+                           ? max_blocks_
+                           : int(node_cache[layer_id].size());
+          buffer_counts[iteration_info.read_buffer_id] = nodes_left;
+          StreamFromCache(
+              device, host_alloc, iteration_info.read_buffer_id, layer_id,
+              node_cache, buffer_counts,
+              gpu_params.node_buffers[iteration_info.read_buffer_id]);
+        }
+
+        ++iteration_info.depth;
+        iteration_info.node_offset = 0;
+        iteration_info.tick_tock = !iteration_info.tick_tock;
       } while (nodes_left > 0);
 
-      // Stream the last layer results
-      iteration_info.prob_buffer_id =
-          iteration_info.prob_buffer_id == 0 ? 1 : 0;
+      trees_built += trees_launched;
 
-      job_list.push_front(
-          std::pair<int, int>(buffer_counts[iteration_info.read_buffer_id],
-                              iteration_info.read_buffer_id));
-      buffer_counts[iteration_info.read_buffer_id] = 0;
-      data_rec_func();
-      // barrier->Wait();
-
-      // Prepare next layer
-      layer_id = layer_id == 0 ? 1 : 0;
-      if (!node_cache[layer_id].empty()) {
-        nodes_left = max_blocks_ < node_cache[layer_id].size()
-                         ? max_blocks_
-                         : int(node_cache[layer_id].size());
-        buffer_counts[iteration_info.read_buffer_id] = nodes_left;
-        StreamFromCache(device, host_alloc, iteration_info.read_buffer_id,
-                        layer_id, node_cache, buffer_counts,
-                        gpu_params.node_buffers[iteration_info.read_buffer_id]);
-      }
-
-      ++iteration_info.depth;
-      iteration_info.node_offset = 0;
-      iteration_info.tick_tock = !iteration_info.tick_tock;
-    } while (nodes_left > 0);
-
-    trees_built += trees_launched;
-
-    models.back()->Add(ModelsLib::kNodeArray, tree_nodes.back());
-    models.back()->Add(ModelsLib::kProbArray, tree_probabilities.back());
+      models.back()->Add(ModelsLib::kNodeArray, tree_nodes.back());
+      models.back()->Add(ModelsLib::kProbArray, tree_probabilities.back());
+    }
   }
 
   // run_rec_func = false;
   // barrier->Wait();
   // if (data_rec_thread->joinable()) data_rec_thread->join();
 
+  auto model = models.empty() ? nullptr : models[0];
+  col_array<sp<lib_models::MlModel>> merge_models;
+  for (int i = 1; i < models.size(); ++i) {
+    if (!model)
+      model = models[i];
+    else if (models[i])
+      merge_models.emplace_back(models[i]);
+  }
+  if (!merge_models.empty()) model->Merge(merge_models);
+
   gpu_params.finalize(device);
-  return AggregateModels(models);
+  return model;
 }
 
 template <typename T>
@@ -274,7 +312,7 @@ sp<lib_data::MlResultData<T>> GpuDteAlgorithm<T>::Predict(
   GpuDteAlgorithmShared::gpuDTE_DatasetInfo dataset_info;
   GpuDteAlgorithmShared::gpuDTE_IterationInfo iteration_info;
   auto device = GpuLib::GetInstance().CreateGpuDevice(
-      params->Get<int>(EnsemblesLib::kDevId));
+      params->Get<int>(AlgorithmsLib::kDevId));
   auto result_data = DataLib::GetInstance().CreateResultData<T>();
   auto gpu_params = GpuDteAlgorithmShared::GpuParams<T>();
   int nr_samples = data->GetNrSamples();
@@ -323,164 +361,11 @@ sp<lib_data::MlResultData<T>> GpuDteAlgorithm<T>::Predict(
         predictions[i].emplace_back(
             host_alloc.predictions_cpy[i * target_values + ii]);
   };
-  CoreLib::GetInstance().ParallelFor(0, nr_samples, lambda_func);
+  CoreLib::GetInstance().TBBParallelFor(0, nr_samples, lambda_func);
 
   gpu_params.finalize(device);
   result_data->AddPredictions(predictions);
   return result_data;
-}
-
-template <typename T>
-sp<lib_models::MlModel> GpuDteAlgorithm<T>::AggregateModels(
-    col_array<sp<lib_models::MlModel>> models) {
-  if (models.size() < 2) return models[0];
-  col_array<T> aggregate_prob;
-  std::function<void(int)> rec_add_nodes;
-  col_array<GpuDteAlgorithmShared::gpuDTE_NodeHeader_Classify<T>>
-      aggregate_node;
-  for (int i = 0; i < models.size(); ++i) {
-    auto& node_headers =
-        models[i]
-            ->Get<col_array<
-                GpuDteAlgorithmShared::gpuDTE_NodeHeader_Classify<T>>>(
-                ModelsLib::kNodeArray);
-    auto& prob_data = models[i]->Get<col_array<T>>(ModelsLib::kProbArray);
-    auto trees = models[i]->Get<int>(ModelsLib::kNrTrees);
-    auto targets = models[i]->Get<int>(ModelsLib::kNrTargets);
-    for (int ii = 0; ii < trees; ++ii) {
-      aggregate_node.emplace_back(node_headers[ii]);
-      if (aggregate_node.back().child_count <= 0) {
-        for (int iii = 0; iii < targets; ++iii)
-          aggregate_prob.emplace_back(
-              prob_data[node_headers[ii].probability_start + iii]);
-      }
-    }
-  }
-
-  auto trees_agg = 0;
-  for (int i = 0; i < models.size(); ++i) {
-    auto& node_headers =
-        models[i]
-            ->Get<col_array<
-                GpuDteAlgorithmShared::gpuDTE_NodeHeader_Classify<T>>>(
-                ModelsLib::kNodeArray);
-    auto& prob_data = models[i]->Get<col_array<T>>(ModelsLib::kProbArray);
-    auto trees = models[i]->Get<int>(ModelsLib::kNrTrees);
-    auto targets = models[i]->Get<int>(ModelsLib::kNrTargets);
-    rec_add_nodes = [&](int node_id) {
-      if (aggregate_node[node_id].child_count > 0) {
-        int child_start = int(aggregate_node.size());
-        for (int i = 0; i < aggregate_node[node_id].child_count; ++i) {
-          aggregate_node.emplace_back(
-              node_headers[aggregate_node[node_id].child_start + i]);
-        }
-        aggregate_node[node_id].child_start = child_start;
-        for (int i = 0; i < aggregate_node[node_id].child_count; ++i)
-          rec_add_nodes(child_start + i);
-      } else {
-        int prob_start = int(aggregate_prob.size());
-        for (int ii = 0; ii < targets; ++ii)
-          aggregate_prob.emplace_back(
-              prob_data[aggregate_node[node_id].probability_start + ii]);
-        aggregate_node[node_id].probability_start = prob_start;
-      }
-    };
-
-    for (int ii = 0; ii < trees; ++ii) rec_add_nodes(trees_agg + ii);
-    trees_agg += trees;
-  }
-
-  models[0]->Add(ModelsLib::kNrTrees, trees_agg);
-  models[0]->Add(ModelsLib::kNodeArray, aggregate_node);
-  models[0]->Add(ModelsLib::kProbArray, aggregate_prob);
-  return models[0];
-}
-
-template <typename T>
-col_array<sp<lib_models::MlModel>> GpuDteAlgorithm<T>::SplitModel(
-    sp<lib_models::MlModel> model, const int parts) {
-  auto trees = model->Get<int>(ModelsLib::kNrTrees);
-  auto targets = model->Get<int>(ModelsLib::kNrTargets);
-  col_array<sp<lib_models::MlModel>> models(
-      parts, ModelsLib::GetInstance().CreateModel());
-  auto& node_headers = model->Get<
-      col_array<GpuDteAlgorithmShared::gpuDTE_NodeHeader_Classify<T>>>(
-      ModelsLib::kNodeArray);
-  auto& prob_data = model->Get<col_array<T>>(ModelsLib::kProbArray);
-
-  std::function<void(int)> rec_add_nodes;
-  auto tree_split = trees / parts;
-  for (int i = 0; i < parts; ++i) {
-    col_array<T> prob_array;
-    col_array<GpuDteAlgorithmShared::gpuDTE_NodeHeader_Classify<T>> node_array;
-
-    rec_add_nodes = [&](int node_id) {
-      if (node_array[node_id].child_count > 0) {
-        int child_start = int(node_array.size());
-        for (int i = 0; i < node_array[node_id].child_count; ++i) {
-          node_array.emplace_back(
-              node_headers[node_array[node_id].child_start + i]);
-        }
-        node_array[node_id].child_start = child_start;
-        for (int i = 0; i < node_array[node_id].child_count; ++i)
-          rec_add_nodes(child_start + i);
-      } else {
-        int prob_start = int(prob_array.size());
-        for (int ii = 0; ii < targets; ++ii)
-          prob_array.emplace_back(
-              prob_data[node_array[node_id].probability_start + ii]);
-        node_array[node_id].probability_start = prob_start;
-      }
-    };
-
-    models[i]->Add(ModelsLib::kNrTrees, tree_split);
-    models[i]->Add(ModelsLib::kNrTargets, targets);
-    models[i]->Add(ModelsLib::kNrFeatures,
-                   model->Get<int>(ModelsLib::kNrFeatures));
-    models[i]->Add(
-        ModelsLib::kModelType,
-        model->Get<AlgorithmsLib::AlgorithmType>(ModelsLib::kModelType));
-
-    auto tree_offset = tree_split * i;
-    for (int ii = 0; ii < tree_split; ++ii) {
-      node_array.emplace_back(node_headers[tree_offset + ii]);
-      if (node_array.back().child_count <= 0) {
-        int prob_start = int(prob_array.size());
-        for (int iii = 0; iii < targets; ++iii)
-          prob_array.emplace_back(
-              prob_data[node_headers[tree_offset + ii].probability_start +
-                        iii]);
-        node_array.back().probability_start = prob_start;
-      }
-    }
-
-    for (int ii = 0; ii < tree_split; ++ii) rec_add_nodes(ii);
-
-    models[i]->Add(ModelsLib::kNodeArray, node_array);
-    models[i]->Add(ModelsLib::kProbArray, prob_array);
-  }
-  return models;
-}
-
-template <typename T>
-sp<lib_data::MlResultData<T>> GpuDteAlgorithm<T>::AggregateResults(
-    col_array<sp<lib_data::MlResultData<T>>> results) {
-  for (int i = 1; i < results.size(); ++i) *results[0] += *results[i];
-  return results[0];
-}
-
-template <typename T>
-col_array<sp<lib_algorithms::MlAlgorithmParams>>
-GpuDteAlgorithm<T>::SplitParameterPack(
-    sp<lib_algorithms::MlAlgorithmParams> params, const int parts) {
-  col_array<sp<lib_algorithms::MlAlgorithmParams>> part_vec;
-  for (int i = 0; i < parts; ++i) {
-    part_vec.emplace_back(EnsemblesLib::GetInstance().CreateGpuRfParamPack());
-    part_vec.back()->Set(EnsemblesLib::kNrTrees,
-                         params->Get<int>(EnsemblesLib::kNrTrees) / parts);
-  }
-
-  return part_vec;
 }
 
 template <typename T>
@@ -494,7 +379,7 @@ void GpuDteAlgorithm<T>::AllocateFit(
   auto nr_samples = data->GetNrSamples();
   auto nr_features = data->GetNrFeatures();
   auto nr_targets = data->GetNrTargets();
-  auto nr_total_trees = params->Get<int>(EnsemblesLib::kNrTrees);
+  auto nr_total_trees = params->Get<int>(AlgorithmsLib::kNrTrees);
 
   // Allocate training buffers
   auto& data_samples = data->GetSamples();
@@ -504,7 +389,7 @@ void GpuDteAlgorithm<T>::AllocateFit(
   for (int i = 0; i < 3; ++i) {
     mem_offsets.emplace_back(std::pair<void**, size_t>(
         (void**)&gpu_params->node_buffers[i],
-        sizeof(GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T>) *
+        sizeof(lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>) *
             max_blocks_));
   }
   for (int i = 0; i < 2; ++i) {
@@ -567,20 +452,20 @@ void GpuDteAlgorithm<T>::AllocateFit(
   dataset_info.nr_attributes = nr_features;
   dataset_info.nr_instances = nr_samples;
   dataset_info.nr_target_values = nr_targets;
-  dataset_info.data_type = params->Get<int>(EnsemblesLib::kAlgoType);
+  dataset_info.data_type = params->Get<int>(AlgorithmsLib::kAlgoType);
 
   memset(&static_info, 0, sizeof(static_info));
   static_info.loaded_trees = max_tree_batch_;
   static_info.total_trees = nr_total_trees;
-  static_info.max_node_size = params->Get<int>(EnsemblesLib::kMinNodeSize);
-  static_info.max_node_depth = params->Get<int>(EnsemblesLib::kMaxDepth);
+  static_info.max_node_size = params->Get<int>(AlgorithmsLib::kMinNodeSize);
+  static_info.max_node_depth = params->Get<int>(AlgorithmsLib::kMaxDepth);
   static_info.node_buffer_size = 1024;
 
-  auto k = params->Get<int>(EnsemblesLib::kNrFeatures);
+  auto k = params->Get<int>(AlgorithmsLib::kNrFeatures);
   static_info.nr_features = k > 0 ? k : int(std::round(log(nr_features))) + 1;
   static_info.max_class_count = nr_targets;
   static_info.balanced_sampling =
-      params->Get<bool>(EnsemblesLib::kEasyEnsemble);
+      params->Get<bool>(AlgorithmsLib::kEasyEnsemble);
 
   memset(&iteration_info, 0, sizeof(iteration_info));
   iteration_info.read_buffer_id = iteration_info.write_buffer_id = 0;
@@ -612,8 +497,8 @@ void GpuDteAlgorithm<T>::AllocatePredict(
   if (model_type == AlgorithmsLib::kRegression) nr_targets = 1;
 
   // Allocate prediction buffers
-  auto& node_headers = model->Get<
-      col_array<GpuDteAlgorithmShared::gpuDTE_NodeHeader_Classify<T>>>(
+  auto& node_headers = model->Get<col_array<
+      lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Classify<T>>>(
       ModelsLib::kNodeArray);
   auto& prob_data = model->Get<col_array<T>>(ModelsLib::kProbArray);
   auto& data_samples = data->GetSamples();
@@ -623,7 +508,7 @@ void GpuDteAlgorithm<T>::AllocatePredict(
       (void**)&gpu_params->predictions, sizeof(T) * nr_samples * nr_targets));
   mem_offsets.emplace_back(std::pair<void**, size_t>(
       (void**)&gpu_params->node_buffers_classify,
-      sizeof(GpuDteAlgorithmShared::gpuDTE_NodeHeader_Classify<T>) *
+      sizeof(lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Classify<T>) *
           int(node_headers.size())));
   mem_offsets.emplace_back(
       std::pair<void**, size_t>((void**)&gpu_params->probability_tmp_buffer,
@@ -636,7 +521,7 @@ void GpuDteAlgorithm<T>::AllocatePredict(
   for (int i = 0; i < mem_offsets.size(); ++i)
     dev->AllocateMemory(mem_offsets[i].first, mem_offsets[i].second);
 
-  GpuDteAlgorithmShared::gpuDTE_NodeHeader_Classify<T>* node_head_cpy;
+  lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Classify<T>* node_head_cpy;
   T* prob_data_cpy;
   T* data_samples_cpy;
   T* pred_init_cpy;
@@ -645,23 +530,25 @@ void GpuDteAlgorithm<T>::AllocatePredict(
                           sizeof(T) * nr_samples * nr_targets);
   dev->AllocateHostMemory(
       (void**)&node_head_cpy,
-      sizeof(GpuDteAlgorithmShared::gpuDTE_NodeHeader_Classify<T>) *
-          node_headers.size());
+      sizeof(lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Classify<T>) *
+          (node_headers.size()));
   dev->AllocateHostMemory((void**)&prob_data_cpy, sizeof(T) * prob_data.size());
   dev->AllocateHostMemory((void**)&data_samples_cpy,
                           sizeof(T) * data_samples.size());
   dev->AllocateHostMemory((void**)&attribute_cpy, sizeof(int) * nr_features);
   memset(attribute_cpy, 2, sizeof(int) * nr_features);
   memset(pred_init_cpy, 0, sizeof(T) * nr_samples * nr_targets);
-  memcpy(node_head_cpy, node_headers.data(),
-         sizeof(GpuDteAlgorithmShared::gpuDTE_NodeHeader_Classify<T>) *
-             node_headers.size());
+  memcpy(
+      node_head_cpy, node_headers.data(),
+      sizeof(lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Classify<T>) *
+          node_headers.size());
+
   memcpy(prob_data_cpy, prob_data.data(), sizeof(T) * prob_data.size());
   memcpy(data_samples_cpy, data_samples.data(),
          sizeof(T) * data_samples.size());
   dev->CopyToDevice(
       node_head_cpy, gpu_params->node_buffers_classify,
-      sizeof(GpuDteAlgorithmShared::gpuDTE_NodeHeader_Classify<T>) *
+      sizeof(lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Classify<T>) *
           node_headers.size());
   dev->CopyToDevice(prob_data_cpy, gpu_params->probability_tmp_buffer,
                     sizeof(T) * prob_data.size());
@@ -681,14 +568,14 @@ void GpuDteAlgorithm<T>::AllocatePredict(
   memset(&static_info, 0, sizeof(static_info));
   static_info.loaded_trees = nr_trees;
   static_info.total_trees = nr_trees;
-  static_info.max_node_size = params->Get<int>(EnsemblesLib::kMinNodeSize);
-  static_info.max_node_depth = params->Get<int>(EnsemblesLib::kMaxDepth);
+  static_info.max_node_size = params->Get<int>(AlgorithmsLib::kMinNodeSize);
+  static_info.max_node_depth = params->Get<int>(AlgorithmsLib::kMaxDepth);
 
-  auto k = params->Get<int>(EnsemblesLib::kNrFeatures);
+  auto k = params->Get<int>(AlgorithmsLib::kNrFeatures);
   static_info.nr_features = k > 0 ? k : int(std::round(log(nr_features))) + 1;
   static_info.max_class_count = nr_targets;
   static_info.balanced_sampling =
-      params->Get<bool>(EnsemblesLib::kEasyEnsemble);
+      params->Get<bool>(AlgorithmsLib::kEasyEnsemble);
 
   memset(&iteration_info, 0, sizeof(iteration_info));
   iteration_info.read_buffer_id = 0;
@@ -715,17 +602,19 @@ template <typename T>
 void GpuDteAlgorithm<T>::StreamToCache(
     sp<lib_gpu::GpuDevice> dev, HostAllocFit& host_alloc, int src_id,
     int layer_id,
-    col_array<col_array<GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T>>>&
+    col_array<
+        col_array<lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>>>&
         node_cache,
     col_array<int>& buffer_counts,
-    GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T>* node_headers) {
+    lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>* node_headers) {
   int nr_nodes = buffer_counts[src_id];
   buffer_counts[src_id] = 0;
   if (nr_nodes <= 0) return;
 
   dev->CopyToHost(
       host_alloc.node_cpy, node_headers,
-      nr_nodes * sizeof(GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T>));
+      nr_nodes *
+          sizeof(lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>));
   dev->SynchronizeDevice();
 
   // Add to cache
@@ -738,18 +627,21 @@ template <typename T>
 void GpuDteAlgorithm<T>::StreamFromCache(
     sp<lib_gpu::GpuDevice> dev, HostAllocFit& host_alloc, int dst_id,
     int layer_id,
-    col_array<col_array<GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T>>>&
+    col_array<
+        col_array<lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>>>&
         node_cache,
     col_array<int>& buffer_counts,
-    GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T>* node_headers) {
+    lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>* node_headers) {
   int nr_nodes = buffer_counts[dst_id];
 
   // Pre-stream next layer chunk for next iteration
   memcpy(host_alloc.node_cpy, node_cache[layer_id].data(),
-         sizeof(GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T>) * nr_nodes);
+         sizeof(lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>) *
+             nr_nodes);
   dev->CopyToDevice(
       host_alloc.node_cpy, node_headers,
-      sizeof(GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T>) * nr_nodes);
+      sizeof(lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>) *
+          nr_nodes);
 
   if (node_cache[layer_id].size() - nr_nodes > 0)
     for (int i = 0; i < node_cache[layer_id].size() - nr_nodes; ++i)
@@ -767,7 +659,8 @@ GpuDteAlgorithm<T>::HostAllocFit::HostAllocFit(sp<lib_gpu::GpuDevice> dev,
                            sizeof(T) * max_blocks_ * targets * max_nominal_);
   dev_->AllocateHostMemory(
       (void**)&node_cpy,
-      sizeof(GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T>) * max_blocks_);
+      sizeof(lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>) *
+          max_blocks_);
   dev_->AllocateHostMemory((void**)&node_cursor_cpy, sizeof(int) * 3);
 }
 template <typename T>

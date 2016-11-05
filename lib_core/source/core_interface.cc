@@ -26,6 +26,7 @@ CoreInterface& CoreInterface::GetInstance() {
   return instance;
 }
 void CoreInterface::ThrowException(string msg) {
+  std::cout << msg << std::endl;
   exception_stack_.emplace_back(msg);
   template_exception exception;
   exception.SetDesc(msg);

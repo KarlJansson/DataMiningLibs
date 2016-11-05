@@ -2,7 +2,7 @@
 
 #include "gpudte_algorithm_shared.h"
 
-namespace lib_ensembles {
+namespace lib_cuda_algorithms {
 template <typename T>
 GpuDteAlgorithmShared::GpuParams<T>::GpuParams() {
   node_cursors = nullptr;

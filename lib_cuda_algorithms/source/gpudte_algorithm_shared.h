@@ -1,11 +1,12 @@
 #pragma once
 #include "../../source_shared/include/global_defines.h"
 
+#include "../../lib_algorithms/include/dte_algorithm_shared.h"
 #include "../../lib_gpu/include/gpu_device.h"
 
 struct curandStateMRG32k3a;
 
-namespace lib_ensembles {
+namespace lib_cuda_algorithms {
 #define block_size_ 64
 #define max_blocks_ 1024
 #define max_tree_batch_ 100
@@ -15,7 +16,6 @@ namespace lib_ensembles {
 #define node_id_ 2
 #define new_nodes_ 1
 #define work_cursor_ 0
-#define flt_max 3.402823466e+38F
 
 class GpuDteAlgorithmShared {
  public:
@@ -68,28 +68,6 @@ class GpuDteAlgorithmShared {
   };
 
   template <typename T>
-  struct gpuDTE_NodeHeader_Train {
-    int tracking_id;
-    int parent_id;
-
-    int node_index_start;
-    int node_index_count;
-
-    int attribute;
-    T split_point;
-  };
-
-  template <typename T>
-  struct gpuDTE_NodeHeader_Classify {
-    int child_start;
-    int child_count;
-    int probability_start;
-
-    int attribute;
-    T split_point;
-  };
-
-  template <typename T>
   class GpuParams {
    public:
     GpuParams();
@@ -104,8 +82,10 @@ class GpuDteAlgorithmShared {
     // Global buffers
     int *node_cursors;
     T *probability_buffers[2];
-    gpuDTE_NodeHeader_Train<T> *node_buffers[3];
-    gpuDTE_NodeHeader_Classify<T> *node_buffers_classify;
+    lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>
+        *node_buffers[3];
+    lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Classify<T>
+        *node_buffers_classify;
 
     gpuDTE_TmpNodeValues<T> *node_tmp_buffer;
     T *probability_tmp_buffer;

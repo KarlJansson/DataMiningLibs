@@ -2,9 +2,9 @@
 #include "gpudte.h"
 
 #include "../../lib_algorithms/include/ml_algorithm.h"
-#include "../../lib_ensembles/source/gpudte_algorithm_shared.h"
+#include "../../lib_cuda_algorithms/source/gpudte_algorithm_shared.h"
 
-namespace lib_ensembles {
+namespace lib_cuda_algorithms {
 template <typename T>
 class GpuErt : public GpuDte<T> {
  public:
@@ -27,13 +27,13 @@ class GpuErt : public GpuDte<T> {
 
   __device__ T eval_numeric_attribute(
       GpuDteAlgorithmShared::GpuParams<T> *params,
-      GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T> &node,
+	  lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T> &node,
       GpuDteAlgorithmShared::gpuDTE_TmpNodeValues<T> &tmp_node, T *curr_dist,
       int att_type);
 
   __device__ T varianceCalculation(
       GpuDteAlgorithmShared::GpuParams<T> *params,
-      GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T> &node,
+	  lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T> &node,
       GpuDteAlgorithmShared::gpuDTE_TmpNodeValues<T> &tmp_node, T *curr_dist);
 };
 }

@@ -6,5 +6,6 @@
 #include "../../lib_algorithms/include/ml_algorithm_params.h"
 #include "../../lib_algorithms/include/ml_algorithm.h"
 #include "../../lib_algorithms/include/algorithms_interface.h"
+#include "../../lib_algorithms/include/dte_algorithm_shared.h"
 
 using AlgorithmsLib = lib_algorithms::AlgorithmsInterface;

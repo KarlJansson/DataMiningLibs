@@ -4,7 +4,7 @@
 #include "../../lib_gpu/include/cuda_kernel_helpers.hpp"
 #include "gpurf.h"
 
-namespace lib_ensembles {
+namespace lib_cuda_algorithms {
 template <typename T>
 __global__ void host_kernel(GpuRf<T>* gpu_algo,
                             GpuDteAlgorithmShared::GpuParams<T> params,
@@ -115,7 +115,7 @@ __device__ void GpuRf<T>::gpurf_initialize_tree_batch(
   __syncthreads();
 
   if (threadIdx.x == 0) {
-    GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T> root;
+    lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T> root;
     root.parent_id = -2;
     root.attribute = -2;
     root.split_point = -2;
@@ -134,7 +134,8 @@ __device__ void GpuRf<T>::gpurf_find_split(
   __shared__ T s_dynamic_shared[40];
   __shared__ unsigned int s_histograms[1024];
   __shared__ unsigned int s_offsets[256];
-  __shared__ GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T> s_tree_node;
+  __shared__ lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>
+      s_tree_node;
   __shared__ GpuDteAlgorithmShared::gpuDTE_TmpNodeValues<T> s_tmp_node;
   __shared__ int s_attribute_type;
   __shared__ bool s_sensible_split;
@@ -304,7 +305,7 @@ __device__ void GpuRf<T>::gpurf_oob_estimate(
   if (inBag) return;
 
   T dataPoint;
-  GpuDteAlgorithmShared::gpuDTE_NodeHeader_Classify<T> tree_node =
+  lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Classify<T> tree_node =
       params->node_buffers_classify[treeId];
   while (tree_node.child_count != 0) {
     int attribute_type = params->attribute_type[tree_node.attribute];
@@ -378,7 +379,7 @@ __device__ void GpuRf<T>::gpurf_feature_importance(
   int instance;
   curandStateMRG32k3a localState = params->random_states[blockIdx.x];
   T dataPoint;
-  GpuDteAlgorithmShared::gpuDTE_NodeHeader_Classify<T> tree_node =
+  lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Classify<T> tree_node =
       params->node_buffers_classify[treeId];
   while (tree_node.child_count != 0) {
     int attribute_type = params->attribute_type[tree_node.attribute];
@@ -440,7 +441,7 @@ __device__ void GpuRf<T>::gpurf_feature_importance(
 template <typename T>
 __device__ void GpuRf<T>::radix_sort_on_attribute(
     GpuDteAlgorithmShared::GpuParams<T>* params,
-    GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T>& node,
+    lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>& node,
     GpuDteAlgorithmShared::gpuDTE_TmpNodeValues<T>& tmp_node,
     unsigned int s_histograms[1024], unsigned int s_offsets[256]) {
   __shared__ unsigned int s_nrNegativeValues;
@@ -618,7 +619,7 @@ __device__ void GpuRf<T>::radix_sort_on_attribute(
 template <typename T>
 __device__ T GpuRf<T>::eval_numeric_attribute(
     GpuDteAlgorithmShared::GpuParams<T>* params,
-    GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T>& node,
+    lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>& node,
     GpuDteAlgorithmShared::gpuDTE_TmpNodeValues<T>& tmp_node, T* curr_dist,
     int att_type, unsigned int* s_histograms, unsigned int* s_offsets) {
   __shared__ T local_dist[40];
@@ -770,7 +771,7 @@ __device__ T GpuRf<T>::eval_numeric_attribute(
 template <typename T>
 __device__ T GpuRf<T>::variance_calculation(
     GpuDteAlgorithmShared::GpuParams<T>* params,
-    GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T>& node,
+    lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>& node,
     GpuDteAlgorithmShared::gpuDTE_TmpNodeValues<T>& tmp_node, T* curr_dist,
     T* s_histograms) {
   int numInds = node.node_index_count;

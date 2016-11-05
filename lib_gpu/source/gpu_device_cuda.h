@@ -34,7 +34,6 @@ class GpuDeviceCuda : public GpuDevice {
     col_array<CUstream> streams_;
   };
 
-  void CheckCudaError(cudaError_t error);
   bool CheckCudaError(CUresult error);
 
   sp<CudaDeviceContext> cuda_context_;

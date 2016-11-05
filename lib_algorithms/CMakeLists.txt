@@ -12,11 +12,13 @@ set(dir_list
 	../lib_core/include
 	../lib_parsing/include
 	../lib_ensembles/include
+	${TBB_INCLUDE_DIR}
 )
 
 set(cpp_files
 	../source_shared/precomp.h
 	../source_shared/include/global_defines.h
+	./include/dte_algorithm_shared.h
 
 	./include/ml_algorithm_params.h
 	./include/lib_algorithms.h
@@ -25,20 +27,28 @@ set(cpp_files
 
 	./source/ml_algorithm_params_impl.h
 	./source/gpu_algorithm.h
+	./source/cpu_algorithm.h
+	./source/hybrid_algorithm.h
 
 
 	./source/ml_algorithm_params_impl.cc
 	./source/algorithms_interface.cc
 	../source_shared/precomp.cc
 	./source/gpu_algorithm.cc
+	./source/cpu_algorithm.cc
+	./source/hybrid_algorithm.cc
 )
 
 source_group(source FILES
 	./source/ml_algorithm_params_impl.h
 	./source/gpu_algorithm.h
+	./source/cpu_algorithm.h
+	./source/hybrid_algorithm.h
 
 	./source/ml_algorithm_params_impl.cc
 	./source/gpu_algorithm.cc
+	./source/cpu_algorithm.cc
+	./source/hybrid_algorithm.cc
 )
 
 source_group(interface FILES
@@ -46,6 +56,7 @@ source_group(interface FILES
 	./include/lib_algorithms.h
 	./include/ml_algorithm.h
 	./include/algorithms_interface.h
+	./include/dte_algorithm_shared.h
 
 	./source/algorithms_interface.cc
 )

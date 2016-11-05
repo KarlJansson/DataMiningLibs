@@ -6,6 +6,8 @@ set(dir_list
 	./source
 	../source_shared
 	../source_shared/include
+	../lib_algorithms/include
+	${TBB_INCLUDE_DIR}
 )
 
 set(cpp_files
@@ -14,9 +16,12 @@ set(cpp_files
 	../source_shared/precomp.h
 	./include/lib_models.h
 	./include/ml_model.h
+	./include/ml_model_decorator.h
 	./include/models_interface.h
 	./source/ml_model_impl.h
+	./source/dte_model_decorator.h
 
+	./source/dte_model_decorator.cc
 	../source_shared/precomp.cc
 	./source/models_interface.cc
 	./source/ml_model_impl.cc
@@ -24,13 +29,16 @@ set(cpp_files
 
 source_group(source FILES
 	./source/ml_model_impl.h
-
+	./source/dte_model_decorator.h
+	
+	./source/dte_model_decorator.cc
 	./source/ml_model_impl.cc
 )
 
 source_group(interface FILES
 	./include/lib_models.h
 	./include/ml_model.h
+	./include/ml_model_decorator.h
 	./include/models_interface.h
 
 	./source/models_interface.cc
@@ -49,10 +57,17 @@ source_group(precomp FILES
 CUDA_ADD_LIBRARY(lib_models SHARED ${cpp_files})
 if(UNIX)
 	target_compile_features(lib_models PRIVATE cxx_range_for cxx_contextual_conversions cxx_generic_lambdas)
-endif(UNIX)
-
 target_link_libraries(lib_models
-)
+		debug "${TBB_LIBRARY_DIR}/libtbb_debug.so"
+		optimized "${TBB_LIBRARY_DIR}/libtbb.so"
+	)
+endif(UNIX)
+if(WIN32)
+	target_link_libraries(lib_models
+		debug "${TBB_LIBRARY_DIR}/tbb_debug.lib"
+		optimized "${TBB_LIBRARY_DIR}/tbb.lib"
+	)
+endif(WIN32)
 
 include_directories(lib_models
 	${dir_list}

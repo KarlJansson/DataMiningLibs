@@ -33,6 +33,14 @@ TEST(lib_parsing, csv_parsinfile) {
     auto data2 = parsininterface.ParseFile<double>(ParsingInterface::kCsv,
                                                    "./test_data.csv");
   });
+  ASSERT_NO_THROW({
+    auto data = parsininterface.ParseFile<float>(ParsingInterface::kCsv,
+                                                  "../../runnable_test/abalone.csv");
+  });
+  ASSERT_NO_THROW({
+    auto data2 = parsininterface.ParseFile<double>(ParsingInterface::kCsv,
+                                                   "../../runnable_test/abalone.csv");
+  });
 
   ASSERT_ANY_THROW({
     auto data = parsininterface.ParseFile<float>(ParsingInterface::kCsv,

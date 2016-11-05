@@ -1,5 +1,5 @@
 #pragma once
-#include "../../lib_algorithms/include/lib_algorithms.h"
+#include "lib_algorithms.h"
 
 namespace lib_ensembles {
 class DLLExport EnsemblesInterface {
@@ -14,28 +14,20 @@ class DLLExport EnsemblesInterface {
   * ::sp<MlAlgorithm>
   */
   template <typename T>
-  sp<lib_algorithms::MlAlgorithm<T>> CreateGpuRfAlgorithm();
-  template<typename T>
-  sp<lib_algorithms::MlAlgorithm<T>> CreateGpuErtAlgorithm();
+  sp<lib_algorithms::MlAlgorithm<T>> CreateGpuRf();
+  template <typename T>
+  sp<lib_algorithms::MlAlgorithm<T>> CreateGpuErt();
+  template <typename T>
+  sp<lib_algorithms::MlAlgorithm<T>> CreateHybridRf();
+  template <typename T>
+  sp<lib_algorithms::MlAlgorithm<T>> CreateHybridErt();
+  template <typename T>
+  sp<lib_algorithms::MlAlgorithm<T>> CreateCpuRf();
+  template <typename T>
+  sp<lib_algorithms::MlAlgorithm<T>> CreateCpuErt();
 
-  sp<lib_algorithms::MlAlgorithmParams> CreateGpuRfParamPack();
-  sp<lib_algorithms::MlAlgorithmParams> CreateGpuErtParamPack();
-  enum CommonParams {
-    kDevId = 0,
-
-    kCommonEndMarker
-  };
-  enum DteParams {
-    kNrTrees = kCommonEndMarker,
-    kAlgoType,
-    kNrFeatures,
-    kMaxDepth,
-    kMinNodeSize,
-    kEasyEnsemble,
-    kBagging,
-
-    kDteEndMarker
-  };
+  sp<lib_algorithms::MlAlgorithmParams> CreateRfParamPack();
+  sp<lib_algorithms::MlAlgorithmParams> CreateErtParamPack();
 
  private:
   EnsemblesInterface() = default;

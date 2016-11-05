@@ -6,7 +6,7 @@
 #include "../../lib_core/include/lib_core.h"
 #include "gpuert.h"
 
-namespace lib_ensembles {
+namespace lib_cuda_algorithms {
 template <typename T>
 __global__ void host_kernel(GpuErt<T> *gpu_algo,
                             GpuDteAlgorithmShared::GpuParams<T> params,
@@ -104,7 +104,7 @@ __device__ void GpuErt<T>::gpuert_initialize_tree_batch(
   __syncthreads();
 
   if (threadIdx.x == 0) {
-    GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T> root;
+    lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T> root;
     root.parent_id = -2;
     root.attribute = -2;
     root.split_point = -2;
@@ -120,7 +120,8 @@ template <typename T>
 __device__ void GpuErt<T>::gpuert_find_split(
     GpuDteAlgorithmShared::GpuParams<T> *params) {
   __shared__ T s_dynamic_shared[40];
-  __shared__ GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T> s_tree_node;
+  __shared__ lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>
+      s_tree_node;
   __shared__ GpuDteAlgorithmShared::gpuDTE_TmpNodeValues<T> s_tmp_node;
   __shared__ int s_attribute_type;
   __shared__ bool s_sensible_split;
@@ -242,7 +243,6 @@ __device__ void GpuErt<T>::gpuert_find_split(
         s_tree_node;
     params->node_tmp_buffer[blockIdx.x + params->iteration_info->node_offset] =
         s_tmp_node;
-    // params->random_states[blockIdx.x] = localState;
   }
 }
 template <typename T>
@@ -275,7 +275,7 @@ __device__ void GpuErt<T>::gpuert_predict(
 template <typename T>
 __device__ T GpuErt<T>::eval_numeric_attribute(
     GpuDteAlgorithmShared::GpuParams<T> *params,
-    GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T> &node,
+    lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T> &node,
     GpuDteAlgorithmShared::gpuDTE_TmpNodeValues<T> &tmp_node, T *curr_dist,
     int att_type) {
   int numInds = node.node_index_count;
@@ -328,7 +328,7 @@ __device__ T GpuErt<T>::eval_numeric_attribute(
 template <typename T>
 __device__ T GpuErt<T>::varianceCalculation(
     GpuDteAlgorithmShared::GpuParams<T> *params,
-    GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T> &node,
+    lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T> &node,
     GpuDteAlgorithmShared::gpuDTE_TmpNodeValues<T> &tmp_node, T *curr_dist) {
   __shared__ T s_means[2];
   int numInds = node.node_index_count;

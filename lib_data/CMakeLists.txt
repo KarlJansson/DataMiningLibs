@@ -6,6 +6,7 @@ set(dir_list
 	./source
 	../source_shared
 	../source_shared/include
+	${TBB_INCLUDE_DIR}
 )
 
 set(cpp_files
@@ -55,10 +56,17 @@ source_group(precomp FILES
 CUDA_ADD_LIBRARY(lib_data SHARED ${cpp_files})
 if(UNIX)
 	target_compile_features(lib_data PRIVATE cxx_range_for cxx_contextual_conversions cxx_generic_lambdas)
-endif(UNIX)
-
 target_link_libraries(lib_data
-)
+		debug "${TBB_LIBRARY_DIR}/libtbb_debug.so"
+		optimized "${TBB_LIBRARY_DIR}/libtbb.so"
+	)
+endif(UNIX)
+if(WIN32)
+	target_link_libraries(lib_data
+		debug "${TBB_LIBRARY_DIR}/tbb_debug.lib"
+		optimized "${TBB_LIBRARY_DIR}/tbb.lib"
+	)
+endif(WIN32)
 
 include_directories(lib_data
 	${dir_list}

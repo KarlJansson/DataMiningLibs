@@ -5,17 +5,19 @@ class DLLExport ModelsInterface {
  public:
   static ModelsInterface& GetInstance();
 
-  sp<MlModel> CreateModel();
-  enum GpuDteModel {
+  sp<MlModel> CreateModel(sp<MlModelDecorator> decorator);
+  template <typename T>
+  sp<lib_models::MlModelDecorator> CreateDteModelDecorator();
+  enum DteModel {
     kNrTrees,
-	kNrTargets,
-	kNrFeatures,
+    kNrTargets,
+    kNrFeatures,
     kModelType,
 
     kNodeArray,
-	kProbArray,
+    kProbArray,
 
-    kGpuDteModelEndMarker
+    kDteModelEndMarker
   };
 
  private:

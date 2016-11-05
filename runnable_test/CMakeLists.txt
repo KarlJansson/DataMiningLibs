@@ -21,6 +21,7 @@ set(dir_list
 	../lib_gpu/test
 	../lib_core/test
 	../lib_ensembles/test
+	../lib_cuda_algorithms/test
 	../lib_algorithms/include
 	../lib_julia/include
 	../lib_parsing/include
@@ -29,6 +30,8 @@ set(dir_list
 	../lib_gpu/include
 	../lib_core/include
 	../lib_ensembles/include
+	
+	${TBB_INCLUDE_DIR}
 )
 
 set(cpp_files

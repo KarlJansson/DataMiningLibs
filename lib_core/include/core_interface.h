@@ -20,6 +20,25 @@ class DLLExport CoreInterface {
   }
 
   template <typename I, typename F>
+  class ThreadPoolFunc {
+   public:
+    ThreadPoolFunc(F func) : func_(func) {}
+
+    void operator()(const tbb::blocked_range<I>& range) const {
+      for (int i = range.begin(); i != range.end(); ++i) func_(i);
+    }
+
+   private:
+    F func_;
+  };
+
+  template <typename I, typename F>
+  void TBBParallelFor(I start, I end, F func) {
+    auto tbb_func = ThreadPoolFunc<I, F>(func);
+    tbb::parallel_for(tbb::blocked_range<I>(start, end), tbb_func);
+  }
+
+  template <typename I, typename F>
   void ParallelFor(I start, I end, F func) {
     // Estimate number of threads in the pool
     const static unsigned nb_threads_hint = std::thread::hardware_concurrency();

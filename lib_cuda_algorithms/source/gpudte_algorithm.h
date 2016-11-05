@@ -3,7 +3,7 @@
 #include "../../lib_algorithms/include/lib_algorithms.h"
 #include "gpudte_algorithm_shared.h"
 
-namespace lib_ensembles {
+namespace lib_cuda_algorithms {
 template <typename T>
 class GpuDte;
 template <typename T>
@@ -19,15 +19,6 @@ class GpuDteAlgorithm : public lib_algorithms::MlAlgorithm<T> {
       sp<lib_data::MlDataFrame<T>> data, sp<lib_models::MlModel> model,
       sp<lib_algorithms::MlAlgorithmParams> params) override;
 
-  sp<lib_models::MlModel> AggregateModels(
-      col_array<sp<lib_models::MlModel>> models) override;
-  col_array<sp<lib_models::MlModel>> SplitModel(sp<lib_models::MlModel> model,
-                                                const int parts) override;
-  sp<lib_data::MlResultData<T>> AggregateResults(
-      col_array<sp<lib_data::MlResultData<T>>> results) override;
-  col_array<sp<lib_algorithms::MlAlgorithmParams>> SplitParameterPack(
-      sp<lib_algorithms::MlAlgorithmParams> params, const int parts) override;
-
   sp<GpuDte<T>> gpu_functions_;
 
  private:
@@ -37,7 +28,7 @@ class GpuDteAlgorithm : public lib_algorithms::MlAlgorithm<T> {
     ~HostAllocFit();
 
     T *probability_cpy;
-    GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T> *node_cpy;
+	lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T> *node_cpy;
     int *node_cursor_cpy;
 
     sp<lib_gpu::GpuDevice> dev_;
@@ -72,16 +63,20 @@ class GpuDteAlgorithm : public lib_algorithms::MlAlgorithm<T> {
   void StreamToCache(
       sp<lib_gpu::GpuDevice> dev, HostAllocFit &host_alloc, int src_id,
       int layer_id,
-      col_array<col_array<GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T>>>
+      col_array<col_array<
+          lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>>>
           &node_cache,
       col_array<int> &buffer_counts,
-      GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T> *node_headers);
+      lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>
+          *node_headers);
   void StreamFromCache(
       sp<lib_gpu::GpuDevice> dev, HostAllocFit &host_alloc, int dst_id,
       int layer_id,
-      col_array<col_array<GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T>>>
+      col_array<col_array<
+          lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>>>
           &node_cache,
       col_array<int> &buffer_counts,
-      GpuDteAlgorithmShared::gpuDTE_NodeHeader_Train<T> *node_headers);
+      lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>
+          *node_headers);
 };
 }

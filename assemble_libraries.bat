@@ -13,6 +13,8 @@ set libs[4]=lib_parsing
 set libs[5]=lib_gpu
 set libs[6]=lib_core
 set libs[7]=lib_ensembles
+set libs[8]=lib_cuda_algorithms
+set libs[9]=lib_preprocess
 
 xcopy /s ".\source_shared\include\*" ".\datamininglibs_x64\include\" /Y
 for /F "tokens=2 delims==" %%s in ('set libs[') do xcopy /s ".\%%s\include\*" ".\datamininglibs_x64\include\%%s\include\" /Y

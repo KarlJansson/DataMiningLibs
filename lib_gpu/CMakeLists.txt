@@ -7,6 +7,7 @@ set(dir_list
 	../source_shared
 	../source_shared/include
 	../lib_core/include
+	${TBB_INCLUDE_DIR}
 )
 
 set(cpp_files
