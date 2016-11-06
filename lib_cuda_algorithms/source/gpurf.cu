@@ -622,7 +622,9 @@ __device__ T GpuRf<T>::eval_numeric_attribute(
     lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>& node,
     GpuDteAlgorithmShared::gpuDTE_TmpNodeValues<T>& tmp_node, T* curr_dist,
     int att_type, unsigned int* s_histograms, unsigned int* s_offsets) {
-  __shared__ T local_dist[40];
+  __shared__ T per_thread_shared[block_size_];
+  __shared__ T prior;
+  T local_dist[20 * max_nominal_]; // <-- TODO: This sucks!
   int numInds = node.node_index_count;
   int nodeIndStart = node.node_index_start;
   int inst, bestI = 0;
@@ -630,14 +632,16 @@ __device__ T GpuRf<T>::eval_numeric_attribute(
   T response, bestResponse = 0.0f;
 
   for (int i = 0; i < params->dataset_info->nr_target_values; ++i)
-    local_dist[i + params->dataset_info->nr_target_values] = 0;
+    local_dist[params->dataset_info->nr_target_values + i] = 0;
   for (int i = 0; i < params->dataset_info->nr_target_values; ++i)
     local_dist[i] =
         curr_dist[i] + curr_dist[i + params->dataset_info->nr_target_values];
 
-  s_offsets[threadIdx.x] = 0;
-  T prior = entropy_over_columns((T*)curr_dist, att_type,
+  if (threadIdx.x == 0)
+    prior = entropy_over_columns((T*)curr_dist, att_type,
                                  params->dataset_info->nr_target_values);
+
+  s_offsets[threadIdx.x] = 0;
 
   __syncthreads();
 
@@ -698,8 +702,7 @@ __device__ T GpuRf<T>::eval_numeric_attribute(
     __syncthreads();
   }
 
-  T* responses = (T*)s_offsets;
-  responses[threadIdx.x] = bestResponse;
+  per_thread_shared[threadIdx.x] = bestResponse;
   s_offsets[threadIdx.x + blockDim.x] = bestI;
 
   for (int i = threadIdx.x;
@@ -711,8 +714,8 @@ __device__ T GpuRf<T>::eval_numeric_attribute(
 
   for (int i = blockDim.x >> 1; i > 0; i >>= 1) {
     if (threadIdx.x < i) {
-      if (responses[i + threadIdx.x] > responses[threadIdx.x]) {
-        responses[threadIdx.x] = responses[i + threadIdx.x];
+      if (per_thread_shared[i + threadIdx.x] > per_thread_shared[threadIdx.x]) {
+        per_thread_shared[threadIdx.x] = per_thread_shared[i + threadIdx.x];
         s_offsets[blockDim.x + threadIdx.x] =
             s_offsets[blockDim.x + threadIdx.x + i];
       }
@@ -723,7 +726,7 @@ __device__ T GpuRf<T>::eval_numeric_attribute(
 
   if (threadIdx.x == 0) {
     bestI = s_offsets[blockDim.x];
-    bestResponse = responses[threadIdx.x];
+    bestResponse = per_thread_shared[threadIdx.x];
 
     if (bestI > 0) {
       T pointBeforeSplit = 0.0f, pointAfterSplit = 0.0f;

@@ -3,7 +3,6 @@
 
 #include "gtest/gtest.h"
 
-
 #include "test_csv_parsing.h"
 #include "test_cpuert.h"
 #include "test_cpurf.h"

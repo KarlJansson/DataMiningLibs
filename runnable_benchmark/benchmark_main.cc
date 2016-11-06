@@ -25,7 +25,7 @@ void RunBenchmark(string msg, sp<lib_algorithms::MlAlgorithm<T>> algo,
     models.emplace_back(algo->Fit(data, params));
     end = std::chrono::system_clock::now();
     elapsed_seconds = end - start;
-    fit_times.push_back(elapsed_seconds.count());
+    fit_times.push_back(T(elapsed_seconds.count()));
     auto str = std::to_string(fit_times.back());
     str = str.substr(0, str.find_last_of('.') + 4);
     std::cout << str << "		";
@@ -97,32 +97,34 @@ int main(int argc, char** argv) {
   col_array<sp<lib_data::MlDataFrame<float>>> flt_df_train, flt_df_test;
   col_array<sp<lib_data::MlDataFrame<double>>> dbl_df_train, dbl_df_test;
   start = std::chrono::system_clock::now();
-  std::cout << "Loading Single Precision Datasets..." << std::endl;
+  std::cout << "Loading Single Precision Datasets:" << std::endl;
+  std::cout << "Loading fit data..." << std::endl;
   auto dataset_names = LoadDatasets(flt_df_train, train_dir);
+  std::cout << "Loading predict data..." << std::endl;
   LoadDatasets(flt_df_test, test_dir);
-  /*std::cout << "Loading Double Precision Datasets..." << std::endl;
-  LoadDatasets(dbl_df_train, train_dir);
-  LoadDatasets(dbl_df_test, test_dir);*/
   end = std::chrono::system_clock::now();
   elapsed_seconds = end - start;
   std::cout << "Loading finished in " << elapsed_seconds.count() << std::endl;
 
-  start = std::chrono::system_clock::now();
   auto ert_params = ens_lib.CreateErtParamPack();
-  ert_params->Set(AlgorithmsLib::kNrTrees, 1000);
+  ert_params->Set(AlgorithmsLib::kNrTrees, 100);
   ert_params->Set(AlgorithmsLib::kTreeBatchSize, 20);
   ert_params->Set(AlgorithmsLib::kMaxDepth, 100);
   ert_params->Set(AlgorithmsLib::kMaxSamplesPerTree, 1000);
   ert_params->Set(AlgorithmsLib::kAlgoType, AlgorithmsLib::kClassification);
 
   auto rf_params = ens_lib.CreateRfParamPack();
-  rf_params->Set(AlgorithmsLib::kNrTrees, 1000);
+  rf_params->Set(AlgorithmsLib::kNrTrees, 100);
   rf_params->Set(AlgorithmsLib::kTreeBatchSize, 10);
   rf_params->Set(AlgorithmsLib::kMaxDepth, 100);
   rf_params->Set(AlgorithmsLib::kMaxSamplesPerTree, 1000);
   rf_params->Set(AlgorithmsLib::kAlgoType, AlgorithmsLib::kClassification);
 
+  start = std::chrono::system_clock::now();
   std::cout << std::endl
+            << "---------------------------------------------------------------"
+               "---------------------------"
+            << std::endl
             << "Single Precision Benchmarks" << std::endl
             << "---------------------------------------------------------------"
                "---------------------------"
@@ -152,7 +154,31 @@ int main(int argc, char** argv) {
             << "---------------------------------------------------------------"
                "---------------------------";
 
-  /*std::cout << std::endl
+  end = std::chrono::system_clock::now();
+  elapsed_seconds = end - start;
+  std::cout << std::endl
+            << "Single precision total time: " << elapsed_seconds.count()
+            << std::endl;
+  std::cout << "---------------------------------------------------------------"
+               "---------------------------"
+            << std::endl
+            << std::endl;
+
+  start = std::chrono::system_clock::now();
+  std::cout << "Loading Double Precision Datasets:" << std::endl;
+  std::cout << "Loading fit data..." << std::endl;
+  LoadDatasets(dbl_df_train, train_dir);
+  std::cout << "Loading predict data..." << std::endl;
+  LoadDatasets(dbl_df_test, test_dir);
+  end = std::chrono::system_clock::now();
+  elapsed_seconds = end - start;
+  std::cout << "Loading finished in " << elapsed_seconds.count() << std::endl;
+
+  start = std::chrono::system_clock::now();
+  std::cout << std::endl
+            << std::endl
+            << "---------------------------------------------------------------"
+               "---------------------------"
             << std::endl
             << "Double Precision Benchmarks" << std::endl
             << "---------------------------------------------------------------"
@@ -165,23 +191,28 @@ int main(int argc, char** argv) {
   std::cout << std::endl;
 
   RunBenchmark("CpuErt", ens_lib.CreateCpuErt<double>(), ert_params,
-  dbl_df_train, dbl_df_test);
+               dbl_df_train, dbl_df_test);
   RunBenchmark("GpuErt", ens_lib.CreateGpuErt<double>(), ert_params,
-  dbl_df_train, dbl_df_test);
+               dbl_df_train, dbl_df_test);
   RunBenchmark("HybErt", ens_lib.CreateHybridErt<double>(), ert_params,
-  dbl_df_train, dbl_df_test);
+               dbl_df_train, dbl_df_test);
 
   RunBenchmark("CpuRf", ens_lib.CreateCpuRf<double>(), rf_params, dbl_df_train,
-  dbl_df_test);
+               dbl_df_test);
+  RunBenchmark("GpuRf", ens_lib.CreateGpuRf<double>(), rf_params, dbl_df_train,
+               dbl_df_test);
+  RunBenchmark("HybRf", ens_lib.CreateHybridRf<double>(), rf_params,
+               dbl_df_train, dbl_df_test);
 
   std::cout << std::endl
             << "---------------------------------------------------------------"
                "---------------------------";
-                           */
+
   end = std::chrono::system_clock::now();
   elapsed_seconds = end - start;
   std::cout << std::endl
-            << "Total Time: " << elapsed_seconds.count() << std::endl;
+            << "Double precision total time: " << elapsed_seconds.count()
+            << std::endl;
   std::cout << "---------------------------------------------------------------"
                "---------------------------"
             << std::endl;

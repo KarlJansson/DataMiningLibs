@@ -10,7 +10,7 @@ sp<lib_models::MlModel> hybrid_rf_model_dbl;
 auto hybrid_rf_flt = ensembles_face.CreateHybridRf<float>();
 auto hybrid_rf_dbl = ensembles_face.CreateHybridRf<double>();
 
-/*TEST(lib_ensembles_hybrid_rf, fit_double_rawdata) {
+TEST(lib_ensembles_hybrid_rf, fit_double_rawdata) {
   auto params = ensembles_face.CreateRfParamPack();
   params->Set(AlgorithmsLib::kNrTrees, 100);
   params->Set(AlgorithmsLib::kAlgoType, AlgorithmsLib::kClassification);
@@ -27,7 +27,7 @@ TEST(lib_ensembles_hybrid_rf, predict_double_rawdata) {
       acc = results->GetAccuracy(
           lib_ensembles::data_predict_raw_dbl->GetTargets()););
   std::cout << "[          ] accuracy = " << acc << std::endl;
-}*/
+}
 
 TEST(lib_ensembles_hybrid_rf, fit_float_rawdata) {
   auto params = ensembles_face.CreateRfParamPack();
@@ -68,7 +68,7 @@ TEST(lib_ensembles_hybrid_rf, predict_float_csvdata) {
   std::cout << "[          ] accuracy = " << acc << std::endl;
 }
 
-/*TEST(lib_ensembles_hybrid_rf, fit_double_csvdata) {
+TEST(lib_ensembles_hybrid_rf, fit_double_csvdata) {
   auto params = ensembles_face.CreateRfParamPack();
   params->Set(AlgorithmsLib::kNrTrees, 100);
   params->Set(AlgorithmsLib::kAlgoType, AlgorithmsLib::kClassification);
@@ -84,5 +84,5 @@ TEST(lib_ensembles_hybrid_rf, predict_double_csvdata) {
                                             hybrid_rf_model_dbl, params);
       acc = results->GetAccuracy(lib_ensembles::data_csv_dbl->GetTargets()););
   std::cout << "[          ] accuracy = " << acc << std::endl;
-}*/
+}
 }
