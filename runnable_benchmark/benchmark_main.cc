@@ -109,15 +109,17 @@ int main(int argc, char** argv) {
 
   start = std::chrono::system_clock::now();
   auto ert_params = ens_lib.CreateErtParamPack();
-  ert_params->Set(AlgorithmsLib::kNrTrees, 200);
-  ert_params->Set(AlgorithmsLib::kMaxDepth, 100);
+  ert_params->Set(AlgorithmsLib::kNrTrees, 1000);
   ert_params->Set(AlgorithmsLib::kTreeBatchSize, 20);
+  ert_params->Set(AlgorithmsLib::kMaxDepth, 100);
+  ert_params->Set(AlgorithmsLib::kMaxSamplesPerTree, 1000);
   ert_params->Set(AlgorithmsLib::kAlgoType, AlgorithmsLib::kClassification);
 
   auto rf_params = ens_lib.CreateRfParamPack();
-  rf_params->Set(AlgorithmsLib::kNrTrees, 200);
-  rf_params->Set(AlgorithmsLib::kMaxDepth, 100);
+  rf_params->Set(AlgorithmsLib::kNrTrees, 1000);
   rf_params->Set(AlgorithmsLib::kTreeBatchSize, 10);
+  rf_params->Set(AlgorithmsLib::kMaxDepth, 100);
+  rf_params->Set(AlgorithmsLib::kMaxSamplesPerTree, 1000);
   rf_params->Set(AlgorithmsLib::kAlgoType, AlgorithmsLib::kClassification);
 
   std::cout << std::endl

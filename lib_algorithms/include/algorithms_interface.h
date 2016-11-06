@@ -35,6 +35,7 @@ class DLLExport AlgorithmsInterface {
 	  kAlgoType,
 	  kNrFeatures,
 	  kMaxDepth,
+	  kMaxSamplesPerTree,
 	  kMinNodeSize,
 	  kEasyEnsemble,
 	  kBagging,

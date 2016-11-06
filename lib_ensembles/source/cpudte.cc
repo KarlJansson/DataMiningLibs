@@ -19,8 +19,14 @@ sp<lib_models::MlModel> CpuDte<T>::Fit(
       params->Get<AlgorithmsLib::AlgorithmType>(AlgorithmsLib::kAlgoType);
   const auto min_node_size = params->Get<int>(AlgorithmsLib::kMinNodeSize);
   const auto max_depth = params->Get<int>(AlgorithmsLib::kMaxDepth);
-  const auto batch_size = 1;  // params->Get<int>(EnsemblesLib::kTreeBatchSize);
   const auto nr_samples = data->GetNrSamples();
+  const auto max_samples_per_tree =
+      nr_samples < params->Get<int>(AlgorithmsLib::kMaxSamplesPerTree)
+          ? nr_samples
+          : params->Get<int>(AlgorithmsLib::kMaxSamplesPerTree);
+  const auto nr_fit_samples =
+	  max_samples_per_tree <= 0 ? nr_samples : max_samples_per_tree;
+  const auto batch_size = 1;  // params->Get<int>(EnsemblesLib::kTreeBatchSize);
   const auto nr_features = data->GetNrFeatures();
   const auto nr_targets = data->GetNrTargets();
   bool bagging = params->Get<bool>(AlgorithmsLib::kBagging);
@@ -69,9 +75,9 @@ sp<lib_models::MlModel> CpuDte<T>::Fit(
     col_array<lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Classify<T>>
         tree_nodes, root_nodes;
     col_array<T> tree_probabilities;
-	tree_nodes.reserve(nr_samples);
-	root_nodes.reserve(nr_samples);
-	tree_probabilities.reserve(nr_samples);
+    tree_nodes.reserve(nr_fit_samples);
+    root_nodes.reserve(nr_fit_samples);
+    tree_probabilities.reserve(nr_fit_samples);
 
     std::uniform_int_distribution<> att_rand(0, nr_features - 1);
     std::mt19937 att_rng;
@@ -81,8 +87,8 @@ sp<lib_models::MlModel> CpuDte<T>::Fit(
             2,
             col_array<
                 lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>>());
-	node_queue[0].reserve(nr_samples);
-	node_queue[1].reserve(nr_samples);
+    node_queue[0].reserve(nr_fit_samples);
+    node_queue[1].reserve(nr_fit_samples);
 
     while (true) {
       {
@@ -100,9 +106,10 @@ sp<lib_models::MlModel> CpuDte<T>::Fit(
 
       for (int i = 0; i < batch; ++i) {
         att_rng.seed(trees_left - i);
-        col_array<col_array<int>> tree_indices(2,
-                                               col_array<int>(nr_samples, 0));
-        Seed(trees_left - i, bagging, nr_samples, tree_indices[0]);
+        col_array<col_array<int>> tree_indices(
+            2, col_array<int>(nr_fit_samples, 0));
+        Seed(trees_left - i, bagging, nr_fit_samples, tree_indices[0],
+             nr_samples);
 
         col_array<col_array<T>> dist, best_dist;
         col_array<int> counts, best_counts;
@@ -120,7 +127,7 @@ sp<lib_models::MlModel> CpuDte<T>::Fit(
 
         lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T> root_train;
         init_train_node_func(root_train);
-        root_train.node_index_count = nr_samples;
+        root_train.node_index_count = nr_fit_samples;
         root_train.node_index_start = 0;
         root_train.tracking_id = int(root_nodes.size());
         node_queue[buffer_id].emplace_back(root_train);
@@ -311,14 +318,13 @@ sp<lib_models::MlModel> CpuDte<T>::Fit(
       }
     }
 
-	auto root_offset = int(root_nodes.size());
-	root_nodes.reserve(tree_nodes.size() + root_nodes.size());
-	for (auto &node : root_nodes)
-		node.child_start += root_offset;
-	for (auto &node : tree_nodes) {
-		root_nodes.emplace_back(node);
-		root_nodes.back().child_start += root_offset;
-	}
+    auto root_offset = int(root_nodes.size());
+    root_nodes.reserve(tree_nodes.size() + root_nodes.size());
+    for (auto& node : root_nodes) node.child_start += root_offset;
+    for (auto& node : tree_nodes) {
+      root_nodes.emplace_back(node);
+      root_nodes.back().child_start += root_offset;
+    }
 
     models[id]->Add(ModelsLib::kNrTrees, nr_trees_built);
     models[id]->Add(ModelsLib::kNodeArray, root_nodes);
@@ -495,18 +501,35 @@ T CpuDte<T>::ClassificationResponse(col_array<col_array<T>>& dist,
 
 template <typename T>
 void CpuDte<T>::Seed(int seed, bool bagging, int nr_samples,
-                     col_array<int>& indices) {
+                     col_array<int>& indices, int total_samples) {
   if (bagging) {
     std::mt19937 rng;
     rng.seed(seed);
     int rand_ind;
-    std::uniform_int_distribution<> ind_rand(0, nr_samples - 1);
+    std::uniform_int_distribution<> ind_rand(0, total_samples - 1);
     for (int i = 0; i < nr_samples; ++i) {
       rand_ind = ind_rand(rng);
       indices[i] = rand_ind;
     }
   } else {
-    for (int i = 0; i < nr_samples; ++i) indices[i] = i;
+    if (nr_samples == total_samples)
+      for (int i = 0; i < nr_samples; ++i) indices[i] = i;
+    else {
+      col_array<int> all_indices;
+      all_indices.reserve(total_samples);
+      for (int i = 0; i < total_samples; ++i) all_indices.push_back(i);
+
+      std::mt19937 rng;
+      rng.seed(seed);
+      int rand_ind;
+      for (int i = 0; i < nr_samples; ++i) {
+        std::uniform_int_distribution<> ind_rand(0, all_indices.size() - 1);
+        rand_ind = ind_rand(rng);
+        indices[i] = all_indices[rand_ind];
+        all_indices[rand_ind] = all_indices.back();
+        all_indices.pop_back();
+      }
+    }
   }
 }
 

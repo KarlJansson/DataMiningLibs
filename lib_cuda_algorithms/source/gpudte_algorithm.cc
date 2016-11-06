@@ -380,6 +380,12 @@ void GpuDteAlgorithm<T>::AllocateFit(
   auto nr_features = data->GetNrFeatures();
   auto nr_targets = data->GetNrTargets();
   auto nr_total_trees = params->Get<int>(AlgorithmsLib::kNrTrees);
+  const auto max_samples_per_tree =
+	  nr_samples < params->Get<int>(AlgorithmsLib::kMaxSamplesPerTree)
+	  ? nr_samples
+	  : params->Get<int>(AlgorithmsLib::kMaxSamplesPerTree);
+  const auto nr_fit_samples =
+	  max_samples_per_tree <= 0 ? nr_samples : max_samples_per_tree;
 
   // Allocate training buffers
   auto& data_samples = data->GetSamples();
@@ -395,7 +401,7 @@ void GpuDteAlgorithm<T>::AllocateFit(
   for (int i = 0; i < 2; ++i) {
     mem_offsets.emplace_back(
         std::pair<void**, size_t>((void**)&gpu_params->indices_buffer[i],
-                                  sizeof(int) * nr_samples * max_tree_batch_));
+                                  sizeof(int) * nr_fit_samples * max_tree_batch_));
     mem_offsets.emplace_back(std::pair<void**, size_t>(
         (void**)&gpu_params->probability_buffers[i],
         sizeof(T) * max_blocks_ * nr_targets * max_nominal_));
@@ -412,7 +418,7 @@ void GpuDteAlgorithm<T>::AllocateFit(
       (void**)&gpu_params->target_starts, sizeof(int) * nr_targets));
   mem_offsets.emplace_back(
       std::pair<void**, size_t>((void**)&gpu_params->indices_inbag,
-                                sizeof(bool) * nr_samples * max_blocks_));
+                                sizeof(bool) * nr_fit_samples * max_blocks_));
   mem_offsets.emplace_back(
       std::pair<void**, size_t>((void**)&gpu_params->random_states,
                                 sizeof(curandStateMRG32k3a) * max_blocks_));
@@ -459,6 +465,7 @@ void GpuDteAlgorithm<T>::AllocateFit(
   static_info.total_trees = nr_total_trees;
   static_info.max_node_size = params->Get<int>(AlgorithmsLib::kMinNodeSize);
   static_info.max_node_depth = params->Get<int>(AlgorithmsLib::kMaxDepth);
+  static_info.max_inst_tree = nr_fit_samples;
   static_info.node_buffer_size = 1024;
 
   auto k = params->Get<int>(AlgorithmsLib::kNrFeatures);

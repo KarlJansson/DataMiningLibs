@@ -46,6 +46,8 @@ AlgorithmsInterface::SplitDteParamPack(
                     params->Get<sp<int>>(AlgorithmsLib::kTreeCounter));
     params_new->Set(AlgorithmsLib::kTreeCounterMutex,
                     params->Get<sp<mutex>>(AlgorithmsLib::kTreeCounterMutex));
+    params_new->Set(AlgorithmsLib::kMaxSamplesPerTree,
+                    params->Get<int>(AlgorithmsLib::kMaxSamplesPerTree));
     part_vec.emplace_back(params_new);
     part_vec.back()->Set(AlgorithmsLib::kNrTrees, tree_splits[i]);
   }

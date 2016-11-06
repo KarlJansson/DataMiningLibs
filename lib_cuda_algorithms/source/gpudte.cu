@@ -254,7 +254,8 @@ __device__ void GpuDte<T>::gpudte_perform_split(
 
     if (skip_split ||
         s_tree_node.node_index_count <= static_info.max_node_size ||
-        static_info.max_node_depth <= iteration_info.depth) {
+        (static_info.max_node_depth > 0 &&
+         static_info.max_node_depth <= iteration_info.depth)) {
       s_tree_node.attribute = -1;
       s_tree_node.split_point = -1;
     } else {

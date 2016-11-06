@@ -35,6 +35,7 @@ class GpuDteAlgorithmShared {
     int node_buffer_size;
     int max_node_size;
     int max_node_depth;
+	int max_inst_tree;
     int nr_features;
     int max_class_count;
     bool balanced_sampling;

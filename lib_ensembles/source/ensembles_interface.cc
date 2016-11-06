@@ -58,7 +58,8 @@ sp<lib_algorithms::MlAlgorithmParams> EnsemblesInterface::CreateRfParamPack() {
   // Set default parameters for random forest
   params->Set(AlgorithmsLib::kNrTrees, 100);
   params->Set(AlgorithmsLib::kNrFeatures, 0);
-  params->Set(AlgorithmsLib::kMaxDepth, 1000);
+  params->Set(AlgorithmsLib::kMaxSamplesPerTree, 0);
+  params->Set(AlgorithmsLib::kMaxDepth, 0);
   params->Set(AlgorithmsLib::kMinNodeSize, 5);
   params->Set(AlgorithmsLib::kAlgoType, AlgorithmsLib::kClassification);
   params->Set(AlgorithmsLib::kBagging, true);
@@ -76,7 +77,8 @@ sp<lib_algorithms::MlAlgorithmParams> EnsemblesInterface::CreateErtParamPack() {
   // Set default parameters for random forest
   params->Set(AlgorithmsLib::kNrTrees, 100);
   params->Set(AlgorithmsLib::kNrFeatures, 0);
-  params->Set(AlgorithmsLib::kMaxDepth, 1000);
+  params->Set(AlgorithmsLib::kMaxSamplesPerTree, 0);
+  params->Set(AlgorithmsLib::kMaxDepth, 0);
   params->Set(AlgorithmsLib::kMinNodeSize, 5);
   params->Set(AlgorithmsLib::kAlgoType, AlgorithmsLib::kClassification);
   params->Set(AlgorithmsLib::kBagging, false);

@@ -35,6 +35,7 @@ class CpuDte : public lib_algorithms::MlAlgorithm<T> {
   void featureImportanceThread();
 
   T lnFunc(T num);
-  void Seed(int seed, bool bagging, int nr_samples, col_array<int>& indices);
+  void Seed(int seed, bool bagging, int nr_samples, col_array<int>& indices,
+            int total_samples);
 };
 }

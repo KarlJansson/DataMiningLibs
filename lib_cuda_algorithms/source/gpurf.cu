@@ -64,12 +64,12 @@ __device__ void GpuRf<T>::gpurf_initialize_tree_batch(
         params->dataset_info->data_type == type_classification_)
       s_indexCursor = 0;
     else
-      s_indexCursor = params->dataset_info->nr_instances;
+      s_indexCursor = params->static_info->max_inst_tree;
   }
 
   __syncthreads();
 
-  int treeOffset = params->dataset_info->nr_instances * blockIdx.x;
+  int treeOffset = params->static_info->max_inst_tree * blockIdx.x;
   if (params->dataset_info->data_type == type_classification_ &&
       params->static_info->balanced_sampling) {
     // Initialize probability main buffer
@@ -85,7 +85,7 @@ __device__ void GpuRf<T>::gpurf_initialize_tree_batch(
                           : params->target_starts[i + 1] - 1;
 
       for (int ii = threadIdx.x;
-           ii < params->dataset_info->nr_instances /
+           ii < params->static_info->max_inst_tree /
                     params->dataset_info->nr_target_values;
            ii += blockDim.x) {
         localCursor = GpuDte<T>::AtomicAdd(&s_indexCursor, 1);
@@ -104,7 +104,7 @@ __device__ void GpuRf<T>::gpurf_initialize_tree_batch(
     int stateId = (blockIdx.x * blockDim.x + threadIdx.x) %
                   params->static_info->node_buffer_size;
     curandStateMRG32k3a localState = params->random_states[stateId];
-    for (int i = threadIdx.x; i < params->dataset_info->nr_instances;
+    for (int i = threadIdx.x; i < params->static_info->max_inst_tree;
          i += blockDim.x) {
       randVal = curand(&localState) % params->dataset_info->nr_instances;
       params->indices_buffer[0][treeOffset + i] = randVal;
