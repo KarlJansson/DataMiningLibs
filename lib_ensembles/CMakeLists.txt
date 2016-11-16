@@ -80,8 +80,13 @@ target_link_libraries(lib_ensembles
 	lib_gpu
 	lib_core
 	lib_algorithms
-	lib_cuda_algorithms
 )
+
+if(CUDA_FOUND)
+	target_link_libraries(lib_ensembles 
+		lib_cuda_algorithms
+	)
+endif(CUDA_FOUND)
 
 if (MSVC)
    set_target_properties(lib_ensembles PROPERTIES COMPILE_FLAGS "/Yuprecomp.h")

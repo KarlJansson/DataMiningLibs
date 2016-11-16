@@ -3,14 +3,25 @@
 #include "core_interface.h"
 #include "gpu_device_cuda.h"
 
+#ifdef Cuda_Found
+
 namespace lib_gpu {
 GpuDeviceCuda::GpuDeviceCuda(int dev_id) : GpuDevice(dev_id) {
   int nr_of_gpus = 0;
   if (!CheckCudaError(cuDeviceGetCount(&nr_of_gpus))) return;
-  device_count_ = nr_of_gpus;
-  if (device_count_ == 0) return;
+  device_count_ = 0;
 
-  cuda_context_ = std::make_shared<CudaDeviceContext>(dev_id);
+  for (int i = 0; i < nr_of_gpus; i++) {
+	  cudaDeviceProp prop;
+	  cudaGetDeviceProperties(&prop, i);
+	  if (prop.major >= 2)
+		  device_ids_.push_back(i);
+  }
+
+  if (device_ids_.empty()) return;
+  device_count_ = int(device_ids_.size());
+
+  cuda_context_ = std::make_shared<CudaDeviceContext>(device_ids_[dev_id]);
 }
 
 void GpuDeviceCuda::PushContextOnThread() {
@@ -263,3 +274,4 @@ GpuDeviceCuda::CudaDeviceContext::~CudaDeviceContext() {
   cuCtxDestroy(context_);
 }
 }
+#endif

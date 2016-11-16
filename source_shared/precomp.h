@@ -27,6 +27,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <chrono>
 #ifdef WindowsBuild
 #include <io.h>
 #endif

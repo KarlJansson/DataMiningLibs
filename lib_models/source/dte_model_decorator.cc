@@ -14,21 +14,10 @@ void DteModelDecorator<T>::AggregateModels(
     col_array<sp<lib_models::MlModel>> models) {
   if (models.size() < 2) return;
 
-  auto node_size = 0, prob_size = 0;
-  for (int i = 0; i < models.size(); ++i) {
-	  node_size += models[i]
-		  ->Get<col_array<lib_algorithms::DteAlgorithmShared::
-		  Dte_NodeHeader_Classify<T>>>(
-			  ModelsLib::kNodeArray).size();
-	  prob_size += models[i]->Get<col_array<T>>(ModelsLib::kProbArray).size();
-  }
-
   col_array<T> aggregate_prob;
-  aggregate_prob.reserve(prob_size);
   std::function<void(int)> rec_add_nodes;
   col_array<lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Classify<T>>
       aggregate_node;
-  aggregate_node.reserve(node_size);
 
   for (int i = 0; i < models.size(); ++i) {
     auto& node_headers =
@@ -39,6 +28,8 @@ void DteModelDecorator<T>::AggregateModels(
     auto& prob_data = models[i]->Get<col_array<T>>(ModelsLib::kProbArray);
     auto trees = models[i]->Get<int>(ModelsLib::kNrTrees);
     auto targets = models[i]->Get<int>(ModelsLib::kNrTargets);
+
+    aggregate_node.reserve(aggregate_node.size() + trees);
     for (int ii = 0; ii < trees; ++ii) {
       aggregate_node.emplace_back(node_headers[ii]);
       if (aggregate_node.back().child_count <= 0) {
@@ -78,10 +69,20 @@ void DteModelDecorator<T>::AggregateModels(
       }
     };
 
+    aggregate_node.reserve(aggregate_node.size() + node_headers.size() - trees);
+    aggregate_prob.reserve(aggregate_prob.size() + prob_data.size());
+
     for (int ii = 0; ii < trees; ++ii) rec_add_nodes(trees_agg + ii);
     trees_agg += trees;
+
+    node_headers.clear();
+    prob_data.clear();
+    node_headers.shrink_to_fit();
+    prob_data.shrink_to_fit();
   }
 
+  aggregate_node.shrink_to_fit();
+  aggregate_prob.shrink_to_fit();
   models[0]->Add(ModelsLib::kNrTrees, trees_agg);
   models[0]->Add(ModelsLib::kNodeArray, aggregate_node);
   models[0]->Add(ModelsLib::kProbArray, aggregate_prob);

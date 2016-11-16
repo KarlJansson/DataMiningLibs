@@ -23,10 +23,13 @@ sp<lib_models::MlModel> GpuDteAlgorithm<T>::Fit(
   auto algo_type =
       params->Get<AlgorithmsLib::AlgorithmType>(AlgorithmsLib::kAlgoType);
   auto batch_size = params->Get<int>(AlgorithmsLib::kTreeBatchSize);
+  auto max_gpu_blocks = params->Get<int>(AlgorithmsLib::kMaxGpuBlocks);
   auto nr_samples = data->GetNrSamples();
   auto nr_features = data->GetNrFeatures();
   auto nr_targets = data->GetNrTargets();
   int trees_built = 0;
+  auto k = params->Get<int>(AlgorithmsLib::kNrFeatures);
+  k = k > 0 ? k : int(std::round(log(nr_features))) + 1;
 
   auto decorator = ModelsLib::GetInstance().CreateDteModelDecorator<T>();
   col_array<sp<lib_models::MlModel>> models;
@@ -35,7 +38,7 @@ sp<lib_models::MlModel> GpuDteAlgorithm<T>::Fit(
       col_array<lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Classify<T>>>
       tree_nodes;
   col_array<col_array<T>> tree_probabilities;
-  HostAllocFit host_alloc(device, nr_targets);
+  HostAllocFit host_alloc(device, nr_targets, max_gpu_blocks);
 
   // auto barrier = CoreLib::GetInstance().CreateBarrier(2);
   // bool run_rec_func = true;
@@ -139,7 +142,7 @@ sp<lib_models::MlModel> GpuDteAlgorithm<T>::Fit(
       iteration_info.prob_buffer_id = 0;
       iteration_info.tick_tock = true;
 
-      int trees_launched = batch > max_tree_batch_ ? max_tree_batch_ : batch;
+      int trees_launched = batch > batch_size ? batch_size : batch;
       batch -= trees_launched;
       models.emplace_back(ModelsLib::GetInstance().CreateModel(decorator));
       models.back()->Add(ModelsLib::kNrTrees, trees_launched);
@@ -152,10 +155,10 @@ sp<lib_models::MlModel> GpuDteAlgorithm<T>::Fit(
       col_array<int> buffer_counts(3, 0);
       buffer_counts[iteration_info.read_buffer_id] = nodes_left;
 
-      iteration_info.threads_launched = max_blocks_ * block_size_;
+      iteration_info.threads_launched = max_gpu_blocks * block_size_;
       gpu_functions_->CopyIterationInfo(iteration_info);
       device->SynchronizeDevice();
-      gpu_functions_->CallCudaKernel(max_blocks_ / block_size_, block_size_,
+      gpu_functions_->CallCudaKernel(max_gpu_blocks / block_size_, block_size_,
                                      gpu_params,
                                      GpuDteAlgorithmShared::kSetupKernel);
       device->SynchronizeDevice();
@@ -171,24 +174,33 @@ sp<lib_models::MlModel> GpuDteAlgorithm<T>::Fit(
         bool swap_next = false;
         // Build node layer
         do {
-          int nodes_launched = nodes_left > max_blocks_ / max_nominal_
-                                   ? max_blocks_ / max_nominal_
+          int nodes_launched = nodes_left > max_gpu_blocks / max_nominal_
+                                   ? max_gpu_blocks / max_nominal_
                                    : nodes_left;
 
           nodes_left -= nodes_launched;
+          iteration_info.first_part = true;
           iteration_info.threads_launched = nodes_launched;
           gpu_functions_->CopyIterationInfo(iteration_info);
+          for (int i = 0; i < k; ++i) {
+            gpu_functions_->CallCudaKernel(nodes_launched, block_size_,
+                                           gpu_params,
+                                           GpuDteAlgorithmShared::kFindSplit);
+            device->SynchronizeDevice();
+            if (i == 0) {
+              iteration_info.first_part = false;
+              gpu_functions_->CopyIterationInfo(iteration_info);
+              device->SynchronizeDevice();
+            }
+          }
 
-          gpu_functions_->CallCudaKernel(nodes_launched, block_size_,
-                                         gpu_params,
-                                         GpuDteAlgorithmShared::kFindSplit);
-          device->SynchronizeDevice();
           gpu_functions_->CallCudaKernel(nodes_launched, block_size_,
                                          gpu_params,
                                          GpuDteAlgorithmShared::kPerformSplit);
           device->SynchronizeDevice();
           device->CopyToHost(host_alloc.node_cursor_cpy,
-                             gpu_params.node_cursors, sizeof(int) * 3);
+                             gpu_params.node_cursors,
+                             sizeof(int) * cpy_buffer_size_);
           device->SynchronizeDevice();
 
           iteration_info.node_offset += nodes_launched;
@@ -212,10 +224,10 @@ sp<lib_models::MlModel> GpuDteAlgorithm<T>::Fit(
             // barrier->Wait();
             nodes_left = nodes_pulled;
           } else if (!node_cache[layer_id].empty() &&
-                     nodes_left - int(max_blocks_ / max_nominal_) <= 0) {
-            nodes_pulled = max_blocks_ > node_cache[layer_id].size()
+                     nodes_left - int(max_gpu_blocks / max_nominal_) <= 0) {
+            nodes_pulled = max_gpu_blocks > node_cache[layer_id].size()
                                ? int(node_cache[layer_id].size())
-                               : max_blocks_;
+                               : max_gpu_blocks;
 
             // Pre-stream next layer chunk for next iteration
             buffer_counts[stream_buffer] = nodes_pulled;
@@ -246,7 +258,8 @@ sp<lib_models::MlModel> GpuDteAlgorithm<T>::Fit(
           host_alloc.node_cursor_cpy[work_cursor_] =
               host_alloc.node_cursor_cpy[new_nodes_] = 0;
           device->CopyToDevice(host_alloc.node_cursor_cpy,
-                               gpu_params.node_cursors, sizeof(int) * 3);
+                               gpu_params.node_cursors,
+                               sizeof(int) * cpy_buffer_size_);
           device->SynchronizeDevice();
         } while (nodes_left > 0);
 
@@ -264,8 +277,8 @@ sp<lib_models::MlModel> GpuDteAlgorithm<T>::Fit(
         // Prepare next layer
         layer_id = layer_id == 0 ? 1 : 0;
         if (!node_cache[layer_id].empty()) {
-          nodes_left = max_blocks_ < node_cache[layer_id].size()
-                           ? max_blocks_
+          nodes_left = max_gpu_blocks < node_cache[layer_id].size()
+                           ? max_gpu_blocks
                            : int(node_cache[layer_id].size());
           buffer_counts[iteration_info.read_buffer_id] = nodes_left;
           StreamFromCache(
@@ -321,6 +334,7 @@ sp<lib_data::MlResultData<T>> GpuDteAlgorithm<T>::Predict(
   auto model_type =
       model->Get<AlgorithmsLib::AlgorithmType>(ModelsLib::kModelType);
   if (model_type == AlgorithmsLib::kRegression) target_values = 1;
+  auto max_gpu_blocks = params->Get<int>(AlgorithmsLib::kMaxGpuBlocks);
 
   AllocatePredict(device, params, &gpu_params, data, model, static_info,
                   dataset_info, iteration_info);
@@ -332,8 +346,8 @@ sp<lib_data::MlResultData<T>> GpuDteAlgorithm<T>::Predict(
     int total_threads = nr_trees * nr_samples;
 
     while (total_threads > 0) {
-      launch_threads = ceil(T(total_threads) / T(block_size_)) > max_blocks_
-                           ? max_blocks_ * block_size_
+      launch_threads = ceil(T(total_threads) / T(block_size_)) > max_gpu_blocks
+                           ? max_gpu_blocks * block_size_
                            : total_threads;
       iteration_info.threads_launched = launch_threads;
       gpu_functions_->CopyIterationInfo(iteration_info);
@@ -381,11 +395,13 @@ void GpuDteAlgorithm<T>::AllocateFit(
   auto nr_targets = data->GetNrTargets();
   auto nr_total_trees = params->Get<int>(AlgorithmsLib::kNrTrees);
   const auto max_samples_per_tree =
-	  nr_samples < params->Get<int>(AlgorithmsLib::kMaxSamplesPerTree)
-	  ? nr_samples
-	  : params->Get<int>(AlgorithmsLib::kMaxSamplesPerTree);
+      nr_samples < params->Get<int>(AlgorithmsLib::kMaxSamplesPerTree)
+          ? nr_samples
+          : params->Get<int>(AlgorithmsLib::kMaxSamplesPerTree);
+  auto batch_size = params->Get<int>(AlgorithmsLib::kTreeBatchSize);
   const auto nr_fit_samples =
-	  max_samples_per_tree <= 0 ? nr_samples : max_samples_per_tree;
+      max_samples_per_tree <= 0 ? nr_samples : max_samples_per_tree;
+  auto max_gpu_blocks = params->Get<int>(AlgorithmsLib::kMaxGpuBlocks);
 
   // Allocate training buffers
   auto& data_samples = data->GetSamples();
@@ -396,32 +412,32 @@ void GpuDteAlgorithm<T>::AllocateFit(
     mem_offsets.emplace_back(std::pair<void**, size_t>(
         (void**)&gpu_params->node_buffers[i],
         sizeof(lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>) *
-            max_blocks_));
+            max_gpu_blocks));
   }
   for (int i = 0; i < 2; ++i) {
     mem_offsets.emplace_back(
         std::pair<void**, size_t>((void**)&gpu_params->indices_buffer[i],
-                                  sizeof(int) * nr_fit_samples * max_tree_batch_));
+                                  sizeof(int) * nr_fit_samples * batch_size));
     mem_offsets.emplace_back(std::pair<void**, size_t>(
         (void**)&gpu_params->probability_buffers[i],
-        sizeof(T) * max_blocks_ * nr_targets * max_nominal_));
+        sizeof(T) * max_gpu_blocks * nr_targets * max_nominal_));
   }
   mem_offsets.emplace_back(std::pair<void**, size_t>(
-      (void**)&gpu_params->node_cursors, sizeof(int) * 3));
+      (void**)&gpu_params->node_cursors, sizeof(int) * cpy_buffer_size_));
   mem_offsets.emplace_back(std::pair<void**, size_t>(
       (void**)&gpu_params->node_tmp_buffer,
-      sizeof(GpuDteAlgorithmShared::gpuDTE_TmpNodeValues<T>) * max_blocks_));
+      sizeof(GpuDteAlgorithmShared::gpuDTE_TmpNodeValues<T>) * max_gpu_blocks));
   mem_offsets.emplace_back(std::pair<void**, size_t>(
       (void**)&gpu_params->probability_tmp_buffer,
-      sizeof(T) * max_blocks_ * nr_targets * max_nominal_));
+      sizeof(T) * max_gpu_blocks * nr_targets * max_nominal_));
   mem_offsets.emplace_back(std::pair<void**, size_t>(
       (void**)&gpu_params->target_starts, sizeof(int) * nr_targets));
-  mem_offsets.emplace_back(
-      std::pair<void**, size_t>((void**)&gpu_params->indices_inbag,
-                                sizeof(bool) * nr_fit_samples * max_blocks_));
+  mem_offsets.emplace_back(std::pair<void**, size_t>(
+      (void**)&gpu_params->indices_inbag,
+      sizeof(bool) * nr_fit_samples * max_gpu_blocks));
   mem_offsets.emplace_back(
       std::pair<void**, size_t>((void**)&gpu_params->random_states,
-                                sizeof(curandStateMRG32k3a) * max_blocks_));
+                                sizeof(curandStateMRG32k3a) * max_gpu_blocks));
   mem_offsets.emplace_back(std::pair<void**, size_t>(
       (void**)&gpu_params->attribute_type, sizeof(int) * nr_features));
   mem_offsets.emplace_back(std::pair<void**, size_t>(
@@ -436,14 +452,15 @@ void GpuDteAlgorithm<T>::AllocateFit(
   T* target_cpy;
   int* attribute_cpy;
   int* node_cursor_cpy;
-  dev->AllocateHostMemory((void**)&node_cursor_cpy, sizeof(int) * 3);
+  dev->AllocateHostMemory((void**)&node_cursor_cpy,
+                          sizeof(int) * cpy_buffer_size_);
   dev->AllocateHostMemory((void**)&dataset_cpy,
                           sizeof(T) * data_samples.size());
   dev->AllocateHostMemory((void**)&target_cpy, sizeof(T) * data_targets.size());
   dev->AllocateHostMemory((void**)&attribute_cpy,
                           sizeof(T) * data_samples.size());
   memset(attribute_cpy, 2, sizeof(int) * nr_features);
-  memset(node_cursor_cpy, 0, sizeof(int) * 3);
+  memset(node_cursor_cpy, 0, sizeof(int) * cpy_buffer_size_);
   memcpy(dataset_cpy, data_samples.data(), sizeof(T) * data_samples.size());
   memcpy(target_cpy, data_targets.data(), sizeof(T) * data_targets.size());
   dev->CopyToDevice(dataset_cpy, gpu_params->dataset,
@@ -452,7 +469,8 @@ void GpuDteAlgorithm<T>::AllocateFit(
                     sizeof(T) * data_targets.size());
   dev->CopyToDevice(attribute_cpy, gpu_params->attribute_type,
                     sizeof(int) * nr_features);
-  dev->CopyToDevice(node_cursor_cpy, gpu_params->node_cursors, sizeof(int) * 3);
+  dev->CopyToDevice(node_cursor_cpy, gpu_params->node_cursors,
+                    sizeof(int) * cpy_buffer_size_);
 
   memset(&dataset_info, 0, sizeof(dataset_info));
   dataset_info.nr_attributes = nr_features;
@@ -461,12 +479,12 @@ void GpuDteAlgorithm<T>::AllocateFit(
   dataset_info.data_type = params->Get<int>(AlgorithmsLib::kAlgoType);
 
   memset(&static_info, 0, sizeof(static_info));
-  static_info.loaded_trees = max_tree_batch_;
+  static_info.loaded_trees = batch_size;
   static_info.total_trees = nr_total_trees;
   static_info.max_node_size = params->Get<int>(AlgorithmsLib::kMinNodeSize);
   static_info.max_node_depth = params->Get<int>(AlgorithmsLib::kMaxDepth);
   static_info.max_inst_tree = nr_fit_samples;
-  static_info.node_buffer_size = 1024;
+  static_info.node_buffer_size = max_gpu_blocks;
 
   auto k = params->Get<int>(AlgorithmsLib::kNrFeatures);
   static_info.nr_features = k > 0 ? k : int(std::round(log(nr_features))) + 1;
@@ -660,15 +678,17 @@ void GpuDteAlgorithm<T>::StreamFromCache(
 
 template <typename T>
 GpuDteAlgorithm<T>::HostAllocFit::HostAllocFit(sp<lib_gpu::GpuDevice> dev,
-                                               size_t targets)
+                                               size_t targets,
+                                               int max_gpu_blocks)
     : dev_(dev) {
   dev_->AllocateHostMemory((void**)&probability_cpy,
-                           sizeof(T) * max_blocks_ * targets * max_nominal_);
+                           sizeof(T) * max_gpu_blocks * targets * max_nominal_);
   dev_->AllocateHostMemory(
       (void**)&node_cpy,
       sizeof(lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T>) *
-          max_blocks_);
-  dev_->AllocateHostMemory((void**)&node_cursor_cpy, sizeof(int) * 3);
+          max_gpu_blocks);
+  dev_->AllocateHostMemory((void**)&node_cursor_cpy,
+                           sizeof(int) * cpy_buffer_size_);
 }
 template <typename T>
 GpuDteAlgorithm<T>::HostAllocFit::~HostAllocFit() {

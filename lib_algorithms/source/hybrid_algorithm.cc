@@ -33,7 +33,6 @@ sp<lib_models::MlModel> HybridAlgorithm<T>::Fit(
   auto run_func = [&](int i) {
     if (i < dev_count) {
       param_vec[i]->Set(AlgorithmsLib::kDevId, i);
-      param_vec[i]->Set(AlgorithmsLib::kTreeBatchSize, 10);
       models[i] = device_algorithm_->Fit(data, param_vec[i]);
     } else
       models[i] = cpu_algorithm_->Fit(data, param_vec[i]);

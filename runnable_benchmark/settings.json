@@ -1,0 +1,14 @@
+{
+  "fit_data_dir": "../../runnable_benchmark/benchmark_data",
+  "predict_data_dir": "../../runnable_benchmark/benchmark_test",
+  "run_single_precision": 1,
+  "run_double_precision": 0,
+
+  "kRepetitions": 1,
+  "kNrTrees": 100,
+  "kMaxDepth": 100,
+  "kTreeBatchSize": 100,
+  "kMaxSamplesPerTree": 100000,
+  "kNrFeatures": 0,
+  "kMinNodeSize": 10
+}

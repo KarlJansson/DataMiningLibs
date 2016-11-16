@@ -39,6 +39,7 @@ class DLLExport AlgorithmsInterface {
 	  kMinNodeSize,
 	  kEasyEnsemble,
 	  kBagging,
+	  kMaxGpuBlocks,
 
 	  kDteEndMarker
   };

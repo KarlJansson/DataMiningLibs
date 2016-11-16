@@ -1,6 +1,8 @@
 #include "precomp.h"
 
+#ifdef Cuda_Found
 #include "gpu_device_cuda.h"
+#endif
 #include "gpu_device_opencl.h"
 #include "gpu_interface.h"
 
@@ -18,7 +20,9 @@ sp<GpuDevice> GpuInterface::CreateGpuDevice(int dev_id, PreferredApi pref_api) {
         res = std::make_shared<GpuDeviceOpenCl>(dev_id);
         break;
       }
+#ifdef Cuda_Found
       if (init_cuda_) {
+
         init_cuda_ = false;
         CUresult error = cuInit(0);
         if (error != CUDA_SUCCESS) {
@@ -26,9 +30,11 @@ sp<GpuDevice> GpuInterface::CreateGpuDevice(int dev_id, PreferredApi pref_api) {
           cuda_support_ = false;
           break;
         }
+
       }
       res = std::make_shared<GpuDeviceCuda>(dev_id);
       break;
+#endif
     case kOpenCl:
       res = std::make_shared<GpuDeviceOpenCl>(dev_id);
       break;

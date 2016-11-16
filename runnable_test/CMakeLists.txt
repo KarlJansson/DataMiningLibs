@@ -60,6 +60,12 @@ target_link_libraries(runnable_test
 	lib_ensembles
 )
 
+if(CUDA_FOUND)
+	target_link_libraries(runnable_test 
+		lib_cuda_algorithms
+	)
+endif(CUDA_FOUND)
+
 include_directories(runnable_test
 	${GTEST_INCLUDE_DIRS}
 	${dir_list}

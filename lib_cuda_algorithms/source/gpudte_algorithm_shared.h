@@ -8,11 +8,12 @@ struct curandStateMRG32k3a;
 
 namespace lib_cuda_algorithms {
 #define block_size_ 64
-#define max_blocks_ 1024
-#define max_tree_batch_ 100
 #define max_nominal_ 2
 #define type_classification_ 0
 #define type_regression_ 1
+
+#define cpy_buffer_size_ 3
+
 #define node_id_ 2
 #define new_nodes_ 1
 #define work_cursor_ 0

@@ -42,6 +42,8 @@ AlgorithmsInterface::SplitDteParamPack(
                     params->Get<bool>(AlgorithmsLib::kEasyEnsemble));
     params_new->Set(AlgorithmsLib::kTreeBatchSize,
                     params->Get<int>(AlgorithmsLib::kTreeBatchSize));
+    params_new->Set(AlgorithmsLib::kMaxGpuBlocks,
+                    params->Get<int>(AlgorithmsLib::kMaxGpuBlocks));
     params_new->Set(AlgorithmsLib::kTreeCounter,
                     params->Get<sp<int>>(AlgorithmsLib::kTreeCounter));
     params_new->Set(AlgorithmsLib::kTreeCounterMutex,

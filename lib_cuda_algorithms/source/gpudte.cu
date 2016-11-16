@@ -20,7 +20,8 @@ __host__ void cpy_iteration_info(
       iteration_info, info, sizeof(GpuDteAlgorithmShared::gpuDTE_IterationInfo),
       0, cudaMemcpyHostToDevice);
   if (error != cudaSuccess)
-    CoreLib::GetInstance().ThrowException("Cuda error.");
+    CoreLib::GetInstance().ThrowException(
+        "Cuda error: " + std::string(cudaGetErrorString(error)));
 }
 
 __host__ void cpy_data_static_info(
@@ -30,12 +31,14 @@ __host__ void cpy_data_static_info(
       dataset_info, data, sizeof(GpuDteAlgorithmShared::gpuDTE_DatasetInfo), 0,
       cudaMemcpyHostToDevice);
   if (error != cudaSuccess)
-    CoreLib::GetInstance().ThrowException("Cuda error.");
+    CoreLib::GetInstance().ThrowException(
+        "Cuda error: " + std::string(cudaGetErrorString(error)));
   error = cudaMemcpyToSymbol(static_info, info,
                              sizeof(GpuDteAlgorithmShared::gpuDTE_StaticInfo),
                              0, cudaMemcpyHostToDevice);
   if (error != cudaSuccess)
-    CoreLib::GetInstance().ThrowException("Cuda error.");
+    CoreLib::GetInstance().ThrowException(
+        "Cuda error: " + std::string(cudaGetErrorString(error)));
 }
 
 template <typename T>

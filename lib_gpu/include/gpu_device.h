@@ -3,7 +3,7 @@
 namespace lib_gpu {
 class DLLExport GpuDevice {
  public:
-  GpuDevice(int dev_id) : dev_id_(dev_id) {}
+  GpuDevice(int dev_id) : device_count_(0), dev_id_(dev_id){}
   virtual ~GpuDevice() {}
 
   virtual void PushContextOnThread() = 0;

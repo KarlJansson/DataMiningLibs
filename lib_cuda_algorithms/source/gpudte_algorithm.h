@@ -24,7 +24,7 @@ class GpuDteAlgorithm : public lib_algorithms::MlAlgorithm<T> {
  private:
   class HostAllocFit {
    public:
-    HostAllocFit(sp<lib_gpu::GpuDevice> dev, size_t targets);
+    HostAllocFit(sp<lib_gpu::GpuDevice> dev, size_t targets, int max_gpu_blocks);
     ~HostAllocFit();
 
     T *probability_cpy;

@@ -52,7 +52,7 @@ __device__ void GpuRf<T>::gpurf_setup_kernel(
 
   // Each thread gets same seed, a different sequence number, no offset
   if (id < params->iteration_info->threads_launched)
-    curand_init(324123, id, 0, &params->random_states[id]);
+    curand_init(324123 + id, id, 0, &params->random_states[id]);
 }
 
 template <typename T>
@@ -138,23 +138,23 @@ __device__ void GpuRf<T>::gpurf_find_split(
       s_tree_node;
   __shared__ GpuDteAlgorithmShared::gpuDTE_TmpNodeValues<T> s_tmp_node;
   __shared__ int s_attribute_type;
-  __shared__ bool s_sensible_split;
 
   curandStateMRG32k3a localState;
+  localState = params->random_states[(blockIdx.x * blockDim.x + threadIdx.x) %
+                                     params->static_info->node_buffer_size];
   if (threadIdx.x == 0) {
-    localState = params->random_states[blockIdx.x];
     s_tree_node =
         params->node_buffers[params->iteration_info->read_buffer_id]
                             [blockIdx.x + params->iteration_info->node_offset];
     s_tmp_node =
         params
             ->node_tmp_buffer[blockIdx.x + params->iteration_info->node_offset];
-    s_tmp_node.tmp_score = 0;
-    s_sensible_split = false;
-    for (int i = 0; i < params->dataset_info->nr_target_values * max_nominal_;
-         ++i)
-      s_dynamic_shared[i] = 0;
+    if (params->iteration_info->first_part) s_tmp_node.tmp_score = 0;
   }
+
+  for (int i = threadIdx.x;
+       i < params->dataset_info->nr_target_values * max_nominal_; ++i)
+    s_dynamic_shared[i] = 0;
 
   __syncthreads();
 
@@ -175,78 +175,71 @@ __device__ void GpuRf<T>::gpurf_find_split(
 
   __syncthreads();
 
-  bool firstFeature = true;
-  int k = params->static_info->nr_features;
-  int max_retries = k - params->dataset_info->nr_attributes < -10
-                        ? -10
-                        : k - params->dataset_info->nr_attributes;
-  while ((k > max_retries) && (k-- > 0 || !s_sensible_split)) {
-    if (threadIdx.x == 0) {
-      s_tmp_node.tmp_attribute =
-          curand(&localState) % params->dataset_info->nr_attributes;
+  bool firstFeature = params->iteration_info->first_part;
 
-      s_attribute_type = params->attribute_type[s_tmp_node.tmp_attribute];
-      s_attribute_type =
-          s_attribute_type >= max_nominal_ ? 2 : s_attribute_type;
-    }
+  if (threadIdx.x == 0) {
+    s_tmp_node.tmp_attribute =
+        curand(&localState) % params->dataset_info->nr_attributes;
 
-    __syncthreads();
+    s_attribute_type = params->attribute_type[s_tmp_node.tmp_attribute];
+    s_attribute_type = s_attribute_type >= max_nominal_ ? 2 : s_attribute_type;
+  }
 
-    // Sort indices on attribute
-    radix_sort_on_attribute(params, s_tree_node, s_tmp_node, s_histograms,
-                            s_offsets);
+  __syncthreads();
 
-    __syncthreads();
+  // Sort indices on attribute
+  radix_sort_on_attribute(params, s_tree_node, s_tmp_node, s_histograms,
+                          s_offsets);
 
-    T response;
-    switch (params->dataset_info->data_type) {
-      case type_classification_:
-        response = eval_numeric_attribute(params, s_tree_node, s_tmp_node,
-                                          s_dynamic_shared, s_attribute_type,
-                                          s_histograms, s_offsets);
-        break;
-      case type_regression_:
-        response =
-            GpuRf::variance_calculation(params, s_tree_node, s_tmp_node,
-                                        s_dynamic_shared, (T*)s_histograms);
-        break;
-    }
+  __syncthreads();
 
-    if (threadIdx.x == 0) {
-      if (s_tmp_node.tmp_score < response || firstFeature) {
-        // Save splitpoint, attribute and distribution
-        s_tmp_node.tmp_score = response;
-        s_tree_node.split_point = s_tmp_node.tmp_split;
-        s_tree_node.attribute = s_tmp_node.tmp_attribute;
+  T response;
+  switch (params->dataset_info->data_type) {
+    case type_classification_:
+      response = eval_numeric_attribute(params, s_tree_node, s_tmp_node,
+                                        s_dynamic_shared, s_attribute_type,
+                                        s_histograms, s_offsets);
+      break;
+    case type_regression_:
+      response = GpuRf::variance_calculation(
+          params, s_tree_node, s_tmp_node, s_dynamic_shared, (T*)s_histograms);
+      break;
+  }
 
-        switch (params->dataset_info->data_type) {
-          case type_classification_:
-            for (int i = 0;
-                 i < params->dataset_info->nr_target_values * max_nominal_; ++i)
-              params->probability_tmp_buffer
-                  [blockIdx.x * params->dataset_info->nr_target_values *
-                       max_nominal_ +
-                   i] = s_dynamic_shared[i];
-            break;
-          case type_regression_:
-            params->probability_tmp_buffer
-                [blockIdx.x * params->dataset_info->nr_target_values *
-                 max_nominal_] = s_dynamic_shared[2];
+  if (threadIdx.x == 0) {
+    if (s_tmp_node.tmp_score < response || firstFeature) {
+      // Save splitpoint, attribute and distribution
+      s_tmp_node.tmp_score = response;
+      s_tree_node.split_point = s_tmp_node.tmp_split;
+      s_tree_node.attribute = s_tmp_node.tmp_attribute;
+
+      switch (params->dataset_info->data_type) {
+        case type_classification_:
+          for (int i = 0;
+               i < params->dataset_info->nr_target_values * max_nominal_; ++i)
             params->probability_tmp_buffer
                 [blockIdx.x * params->dataset_info->nr_target_values *
                      max_nominal_ +
-                 1] = s_dynamic_shared[3];
-            break;
-        }
+                 i] = s_dynamic_shared[i];
+          break;
+        case type_regression_:
+          params
+              ->probability_tmp_buffer[blockIdx.x *
+                                       params->dataset_info->nr_target_values *
+                                       max_nominal_] = s_dynamic_shared[2];
+          params->probability_tmp_buffer
+              [blockIdx.x * params->dataset_info->nr_target_values *
+                   max_nominal_ +
+               1] = s_dynamic_shared[3];
+          break;
       }
-
-      if (s_tmp_node.tmp_score > 1e-3) s_sensible_split = true;
-
-      firstFeature = false;
     }
-
-    __syncthreads();
   }
+
+  __syncthreads();
+
+  params->random_states[(blockIdx.x * blockDim.x + threadIdx.x) %
+                        params->static_info->node_buffer_size] = localState;
 
   // Copy back result
   if (threadIdx.x == 0) {
@@ -255,7 +248,6 @@ __device__ void GpuRf<T>::gpurf_find_split(
         s_tree_node;
     params->node_tmp_buffer[blockIdx.x + params->iteration_info->node_offset] =
         s_tmp_node;
-    params->random_states[blockIdx.x] = localState;
   }
 }
 
@@ -624,7 +616,7 @@ __device__ T GpuRf<T>::eval_numeric_attribute(
     int att_type, unsigned int* s_histograms, unsigned int* s_offsets) {
   __shared__ T per_thread_shared[block_size_];
   __shared__ T prior;
-  T local_dist[20 * max_nominal_]; // <-- TODO: This sucks!
+  T local_dist[20 * max_nominal_];  // <-- TODO: This sucks!
   int numInds = node.node_index_count;
   int nodeIndStart = node.node_index_start;
   int inst, bestI = 0;

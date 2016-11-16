@@ -19,16 +19,36 @@ if(WIN32)
 	add_definitions(-DWindowsBuild)
 	set(CMAKE_CXX_FLAGS_RELEASE  "${CMAKE_CXX_FLAGS_RELEASE} -MP" )
 	set(CUDA_SEPARABLE_COMPILATION ON)
-	set(CUDA_NVCC_FLAGS_DEBUG ${CUDA_NVCC_FLAGS_DEBUG};-gencode arch=compute_30,code=sm_30;-g;-G;-lineinfo)
-	set(CUDA_NVCC_FLAGS_RELEASE ${CUDA_NVCC_FLAGS_RELEASE};-gencode arch=compute_30,code=sm_30;-O3)
-	set(CUDA_NVCC_FLAGS_MINSIZEREL ${CUDA_NVCC_FLAGS_MINSIZEREL};-gencode arch=compute_30,code=sm_30)
+	set(CUDA_NVCC_FLAGS_DEBUG ${CUDA_NVCC_FLAGS_DEBUG};
+	-gencode arch=compute_30,code=sm_30;
+	-g;-G;-lineinfo)
+	set(CUDA_NVCC_FLAGS_RELEASE ${CUDA_NVCC_FLAGS_RELEASE};
+	-gencode arch=compute_20,code=sm_20;
+	-gencode arch=compute_30,code=sm_30;
+	-gencode arch=compute_35,code=sm_35;
+	#-gencode arch=compute_50,code=sm_50;
+	#-gencode arch=compute_60,code=sm_60
+	)
+	set(CUDA_NVCC_FLAGS_MINSIZEREL ${CUDA_NVCC_FLAGS_MINSIZEREL};
+	-gencode arch=compute_20,code=sm_20;
+	-gencode arch=compute_30,code=sm_30;
+	-gencode arch=compute_35,code=sm_35;
+	#-gencode arch=compute_50,code=sm_50;
+	#-gencode arch=compute_60,code=sm_60
+	)
 else(WIN32)
 	set(TBB_INCLUDE_DIR "/usr/include")
 	set(TBB_LIBRARY_DIR "/usr/lib")
 	add_definitions(-DUnixBuild)
 	set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fPIC" )
 	set(CUDA_SEPARABLE_COMPILATION ON)
-	set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_20,code=sm_20;-std=c++11)
+	set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};
+	-gencode arch=compute_20,code=sm_20;
+	-gencode arch=compute_30,code=sm_30;
+	#-gencode arch=compute_35,code=sm_35;
+	#-gencode arch=compute_50,code=sm_50;
+	#-gencode arch=compute_60,code=sm_60;
+	-std=c++11)
 endif(WIN32)
 
 set (LIBRARY_OUTPUT_PATH Build_Output/Libs CACHE PATH "Lib path")

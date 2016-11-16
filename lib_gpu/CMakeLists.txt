@@ -66,19 +66,30 @@ if(WIN32)
 	set(cuda_lib ${CUDA_TOOLKIT_ROOT_DIR}/lib/x64/cuda.lib)
 endif(WIN32)
 
+set(Cuda_Libs)
+set(Cuda_Include)
+if(CUDA_FOUND)
+	set(Cuda_Libs
+		${CUDA_cusparse_LIBRARY}
+		${CUDA_curand_LIBRARY}
+		${CUDA_LIBRARIES}
+		${cuda_lib}
+	)
+	set(Cuda_Include
+		${CUDA_INCLUDE_DIRS}
+	)
+endif(CUDA_FOUND)
+
 target_link_libraries(lib_gpu
-	${CUDA_cusparse_LIBRARY}
-	${CUDA_curand_LIBRARY}
-	${CUDA_LIBRARIES}
-	${cuda_lib}
+	${Cuda_Libs}
 
 	lib_core
 )
 
 include_directories(lib_gpu
-	${dir_list}
+	${Cuda_Include}
 
-	${CUDA_INCLUDE_DIRS}
+	${dir_list}
 )
 
 if (MSVC)

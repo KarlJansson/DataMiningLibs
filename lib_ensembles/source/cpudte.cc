@@ -25,8 +25,8 @@ sp<lib_models::MlModel> CpuDte<T>::Fit(
           ? nr_samples
           : params->Get<int>(AlgorithmsLib::kMaxSamplesPerTree);
   const auto nr_fit_samples =
-	  max_samples_per_tree <= 0 ? nr_samples : max_samples_per_tree;
-  const auto batch_size = 1;  // params->Get<int>(EnsemblesLib::kTreeBatchSize);
+      max_samples_per_tree <= 0 ? nr_samples : max_samples_per_tree;
+  const auto batch_size = 1;
   const auto nr_features = data->GetNrFeatures();
   const auto nr_targets = data->GetNrTargets();
   bool bagging = params->Get<bool>(AlgorithmsLib::kBagging);
@@ -105,11 +105,13 @@ sp<lib_models::MlModel> CpuDte<T>::Fit(
       }
 
       for (int i = 0; i < batch; ++i) {
-        att_rng.seed(trees_left - i);
+        uint64_t seed = std::chrono::high_resolution_clock::now()
+                            .time_since_epoch()
+                            .count();
+        att_rng.seed(int(seed));
         col_array<col_array<int>> tree_indices(
             2, col_array<int>(nr_fit_samples, 0));
-        Seed(trees_left - i, bagging, nr_fit_samples, tree_indices[0],
-             nr_samples);
+        Seed(seed, bagging, nr_fit_samples, tree_indices[0], nr_samples);
 
         col_array<col_array<T>> dist, best_dist;
         col_array<int> counts, best_counts;
@@ -500,11 +502,11 @@ T CpuDte<T>::ClassificationResponse(col_array<col_array<T>>& dist,
 }
 
 template <typename T>
-void CpuDte<T>::Seed(int seed, bool bagging, int nr_samples,
+void CpuDte<T>::Seed(uint64_t seed, bool bagging, int nr_samples,
                      col_array<int>& indices, int total_samples) {
   if (bagging) {
     std::mt19937 rng;
-    rng.seed(seed);
+    rng.seed(int(seed));
     int rand_ind;
     std::uniform_int_distribution<> ind_rand(0, total_samples - 1);
     for (int i = 0; i < nr_samples; ++i) {
@@ -520,10 +522,10 @@ void CpuDte<T>::Seed(int seed, bool bagging, int nr_samples,
       for (int i = 0; i < total_samples; ++i) all_indices.push_back(i);
 
       std::mt19937 rng;
-      rng.seed(seed);
+      rng.seed(int(seed));
       int rand_ind;
       for (int i = 0; i < nr_samples; ++i) {
-        std::uniform_int_distribution<> ind_rand(0, all_indices.size() - 1);
+        std::uniform_int_distribution<> ind_rand(0, int(all_indices.size() - 1));
         rand_ind = ind_rand(rng);
         indices[i] = all_indices[rand_ind];
         all_indices[rand_ind] = all_indices.back();

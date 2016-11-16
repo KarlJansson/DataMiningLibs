@@ -2,8 +2,10 @@
 #ifndef CUDA_API_PER_THREAD_DEFAULT_STREAM
 #define CUDA_API_PER_THREAD_DEFAULT_STREAM
 #endif
+#ifdef Cuda_Found
 #include <cuda.h>
 #include <cuda_runtime_api.h>
+#endif
 #include "../../lib_core/include/core_interface.h"
 #include "../../lib_gpu/include/gpu_device.h"
 
@@ -25,6 +27,7 @@ class GpuDeviceCuda : public GpuDevice {
   void AllocateHostMemory(void **dev_ptr, size_t size) override;
 
  private:
+#ifdef Cuda_Found
   class CudaDeviceContext {
    public:
     CudaDeviceContext(int dev_id);
@@ -37,5 +40,7 @@ class GpuDeviceCuda : public GpuDevice {
   bool CheckCudaError(CUresult error);
 
   sp<CudaDeviceContext> cuda_context_;
+#endif
+  col_array<int> device_ids_;
 };
 }

@@ -48,7 +48,7 @@ __device__ void GpuErt<T>::gpuert_setup_kernel(
 
   // Each thread gets same seed, a different sequence number, no offset
   if (id < params->iteration_info->threads_launched)
-    curand_init(seed, id, 0, &params->random_states[id]);
+    curand_init(seed + id, id, 0, &params->random_states[id]);
 }
 
 template <typename T>
@@ -138,7 +138,6 @@ __device__ void GpuErt<T>::gpuert_find_split(
       s_tree_node;
   __shared__ GpuDteAlgorithmShared::gpuDTE_TmpNodeValues<T> s_tmp_node;
   __shared__ int s_attribute_type;
-  __shared__ bool s_sensible_split;
 
   curandStateMRG32k3a localState;
   localState = params->random_states[(blockIdx.x * blockDim.x + threadIdx.x) %
@@ -150,102 +149,91 @@ __device__ void GpuErt<T>::gpuert_find_split(
     s_tmp_node =
         params
             ->node_tmp_buffer[blockIdx.x + params->iteration_info->node_offset];
-    s_tmp_node.tmp_score = 0;
-    s_sensible_split = false;
+    if (params->iteration_info->first_part) s_tmp_node.tmp_score = 0;
   }
 
   __syncthreads();
 
-  bool firstFeature = true;
-  int k = params->static_info->nr_features;
-  int max_retries = k - params->dataset_info->nr_attributes < -10
-                        ? -10
-                        : k - params->dataset_info->nr_attributes;
-  while ((k > max_retries) && (k-- > 0 || !s_sensible_split)) {
-    if (threadIdx.x == 0) {
-      s_tmp_node.tmp_attribute =
-          curand(&localState) % params->dataset_info->nr_attributes;
-      s_tmp_node.tmp_split = 0;
+  bool firstFeature = params->iteration_info->first_part;
+  if (threadIdx.x == 0) {
+    s_tmp_node.tmp_attribute =
+        curand(&localState) % params->dataset_info->nr_attributes;
+    s_tmp_node.tmp_split = 0;
 
-      s_attribute_type = params->attribute_type[s_tmp_node.tmp_attribute];
-      s_attribute_type =
-          s_attribute_type >= max_nominal_ ? 2 : s_attribute_type;
-    }
+    s_attribute_type = params->attribute_type[s_tmp_node.tmp_attribute];
+    s_attribute_type = s_attribute_type >= max_nominal_ ? 2 : s_attribute_type;
+  }
 
-    for (int i = threadIdx.x;
-         i < params->dataset_info->nr_target_values * max_nominal_;
-         i += blockDim.x)
-      s_dynamic_shared[i] = 0;
+  for (int i = threadIdx.x;
+       i < params->dataset_info->nr_target_values * max_nominal_;
+       i += blockDim.x)
+    s_dynamic_shared[i] = 0;
 
-    __syncthreads();
+  __syncthreads();
 
-    if (threadIdx.x < 10) {
-      T dat = get_data_point(
-          s_tmp_node.tmp_attribute,
-          params->indices_buffer[params->iteration_info->tick_tock ? 0 : 1]
-                                [(curand(&localState) %
-                                  s_tree_node.node_index_count) +
-                                 s_tree_node.node_index_start],
-          params->dataset_info->nr_instances, params->dataset);
+  if (threadIdx.x < 10) {
+    T dat = get_data_point(
+        s_tmp_node.tmp_attribute,
+        params->indices_buffer[params->iteration_info->tick_tock ? 0 : 1]
+                              [(curand(&localState) %
+                                s_tree_node.node_index_count) +
+                               s_tree_node.node_index_start],
+        params->dataset_info->nr_instances, params->dataset);
 
-      GpuDte<T>::AtomicAdd(&s_tmp_node.tmp_split, dat);
-    }
+    GpuDte<T>::AtomicAdd(&s_tmp_node.tmp_split, dat);
+  }
 
-    __syncthreads();
+  __syncthreads();
 
-    if (threadIdx.x == 0) {
-      s_tmp_node.tmp_split /= 10.0f;
-    }
+  if (threadIdx.x == 0) {
+    s_tmp_node.tmp_split /= 10.0f;
+  }
 
-    __syncthreads();
+  __syncthreads();
 
-    T response;
-    switch (params->dataset_info->data_type) {
-      case type_classification_:
-        response = eval_numeric_attribute(params, s_tree_node, s_tmp_node,
-                                          s_dynamic_shared, s_attribute_type);
-        break;
-      case type_regression_:
-        response = varianceCalculation(params, s_tree_node, s_tmp_node,
-                                       s_dynamic_shared);
-        break;
-    }
+  T response;
+  switch (params->dataset_info->data_type) {
+    case type_classification_:
+      response = eval_numeric_attribute(params, s_tree_node, s_tmp_node,
+                                        s_dynamic_shared, s_attribute_type);
+      break;
+    case type_regression_:
+      response = varianceCalculation(params, s_tree_node, s_tmp_node,
+                                     s_dynamic_shared);
+      break;
+  }
 
-    if (threadIdx.x == 0) {
-      if (s_tmp_node.tmp_score < response || firstFeature) {
-        // Save splitpoint, attribute and distribution
-        s_tmp_node.tmp_score = response;
-        s_tree_node.split_point = s_tmp_node.tmp_split;
-        s_tree_node.attribute = s_tmp_node.tmp_attribute;
+  if (threadIdx.x == 0) {
+    if (s_tmp_node.tmp_score < response || firstFeature) {
+      // Save splitpoint, attribute and distribution
+      s_tmp_node.tmp_score = response;
+      s_tree_node.split_point = s_tmp_node.tmp_split;
+      s_tree_node.attribute = s_tmp_node.tmp_attribute;
 
-        switch (params->dataset_info->data_type) {
-          case type_classification_:
-            for (int i = 0;
-                 i < params->dataset_info->nr_target_values * max_nominal_; ++i)
-              params->probability_tmp_buffer
-                  [blockIdx.x * params->dataset_info->nr_target_values *
-                       max_nominal_ +
-                   i] = s_dynamic_shared[i];
-            break;
-          case type_regression_:
-            params->probability_tmp_buffer
-                [blockIdx.x * params->dataset_info->nr_target_values *
-                 max_nominal_] = s_dynamic_shared[2];
+      switch (params->dataset_info->data_type) {
+        case type_classification_:
+          for (int i = 0;
+               i < params->dataset_info->nr_target_values * max_nominal_; ++i)
             params->probability_tmp_buffer
                 [blockIdx.x * params->dataset_info->nr_target_values *
                      max_nominal_ +
-                 1] = s_dynamic_shared[3];
-            break;
-        }
+                 i] = s_dynamic_shared[i];
+          break;
+        case type_regression_:
+          params
+              ->probability_tmp_buffer[blockIdx.x *
+                                       params->dataset_info->nr_target_values *
+                                       max_nominal_] = s_dynamic_shared[2];
+          params->probability_tmp_buffer
+              [blockIdx.x * params->dataset_info->nr_target_values *
+                   max_nominal_ +
+               1] = s_dynamic_shared[3];
+          break;
       }
-
-      if (s_tmp_node.tmp_score > 1e-3) s_sensible_split = true;
-
-      firstFeature = false;
     }
-
-    __syncthreads();
   }
+
+  __syncthreads();
 
   params->random_states[(blockIdx.x * blockDim.x + threadIdx.x) %
                         params->static_info->node_buffer_size] = localState;
@@ -292,15 +280,12 @@ __device__ T GpuErt<T>::eval_numeric_attribute(
     lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T> &node,
     GpuDteAlgorithmShared::gpuDTE_TmpNodeValues<T> &tmp_node, T *curr_dist,
     int att_type) {
-  int numInds = node.node_index_count;
-  int nodeIndStart = node.node_index_start;
-  int weight = 1;
   int inst;
   T val;
 
-  for (int i = threadIdx.x; i < numInds; i += blockDim.x) {
+  for (int i = threadIdx.x; i < node.node_index_count; i += blockDim.x) {
     inst = params->indices_buffer[params->iteration_info->tick_tock ? 0 : 1]
-                                 [nodeIndStart + i];
+                                 [node.node_index_start + i];
 
     val = get_data_point(tmp_node.tmp_attribute, inst,
                          params->dataset_info->nr_instances, params->dataset);
@@ -309,9 +294,9 @@ __device__ T GpuErt<T>::eval_numeric_attribute(
       GpuDte<T>::AtomicAdd(&curr_dist[params->dataset_info->nr_target_values *
                                           ((val < tmp_node.tmp_split) ? 0 : 1) +
                                       int(params->target_data[inst])],
-                           weight);
+                           1);
     else
-      GpuDte<T>::AtomicAdd(&curr_dist[int(params->target_data[inst])], weight);
+      GpuDte<T>::AtomicAdd(&curr_dist[int(params->target_data[inst])], 1);
   }
 
   __syncthreads();
@@ -345,9 +330,6 @@ __device__ T GpuErt<T>::varianceCalculation(
     lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Train<T> &node,
     GpuDteAlgorithmShared::gpuDTE_TmpNodeValues<T> &tmp_node, T *curr_dist) {
   __shared__ T s_means[2];
-  int numInds = node.node_index_count;
-  int nodeIndStart = node.node_index_start;
-  int attribute = tmp_node.tmp_attribute;
   int inst;
   T val;
 
@@ -359,11 +341,11 @@ __device__ T GpuErt<T>::varianceCalculation(
   __syncthreads();
 
   // Calculate mean values from split
-  for (int i = threadIdx.x; i < numInds; i += blockDim.x) {
+  for (int i = threadIdx.x; i < node.node_index_count; i += blockDim.x) {
     inst = params->indices_buffer[params->iteration_info->tick_tock ? 0 : 1]
-                                 [nodeIndStart + i];
-    val = get_data_point(attribute, inst, params->dataset_info->nr_instances,
-                         params->dataset);
+                                 [node.node_index_start + i];
+    val = get_data_point(tmp_node.tmp_attribute, inst,
+                         params->dataset_info->nr_instances, params->dataset);
     int t = node.node_index_count;
     if (val != -flt_max && t > 0) {
       GpuDte<T>::AtomicAdd(&curr_dist[(val < tmp_node.tmp_split) ? 0 : 1], 1);
