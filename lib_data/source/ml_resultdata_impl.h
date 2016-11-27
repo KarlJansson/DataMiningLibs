@@ -17,6 +17,7 @@ class MlResultDataImpl : public MlResultData<T> {
 
   string ToString() override;
   MlResultData<T>& operator+=(const MlResultData<T>& rhs) override;
+  col_array<col_array<T>>& GetPredictions_() override;
  private:
   col_array<col_array<T>> predictions_;
   col_map<string, T> single_val_;

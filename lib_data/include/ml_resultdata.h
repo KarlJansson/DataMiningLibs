@@ -16,5 +16,6 @@ class DLLExport MlResultData {
 
   virtual string ToString() = 0;
   virtual MlResultData<T>& operator+=(const MlResultData<T>& rhs) = 0;
+  virtual col_array<col_array<T>>& GetPredictions_() = 0;
 };
 }

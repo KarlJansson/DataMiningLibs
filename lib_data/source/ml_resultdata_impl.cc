@@ -47,6 +47,11 @@ inline col_array<T> &MlResultDataImpl<T>::GetMultipleValue(string name) {
 }
 
 template <typename T>
+inline col_array<col_array<T>>& MlResultDataImpl<T>::GetPredictions_() {
+  return predictions_;
+}
+
+template <typename T>
 string MlResultDataImpl<T>::ToString() {
   string result = "";
   for (auto &pair : single_val_)
