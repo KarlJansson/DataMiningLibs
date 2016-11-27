@@ -7,6 +7,13 @@ set(dir_list
 	../source_shared
 	../source_shared/include
 	${TBB_INCLUDE_DIR}
+	../lib_models/include
+	../lib_data/include
+	../lib_gpu/include
+	../lib_core/include
+	../lib_parsing/include
+	../lib_algorithms/include
+	../lib_ensembles/include
 )
 
 set(cpp_files
@@ -46,12 +53,22 @@ if(UNIX)
 endif(UNIX)
 
 target_link_libraries(lib_julia
-	lib_algorithms
+	${CUDA_cusparse_LIBRARY}
+	${CUDA_curand_LIBRARY}
+	${CUDA_LIBRARIES}
+	
+	lib_models
+	lib_data
 	lib_parsing
+	lib_gpu
+	lib_core
+	lib_algorithms
+	lib_ensembles
 )
 
 include_directories(lib_julia
 	${dir_list}
+	${CUDA_INCLUDE_DIRS}
 )
 
 if (MSVC)
