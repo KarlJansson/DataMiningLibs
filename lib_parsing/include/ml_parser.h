@@ -12,5 +12,8 @@ class DLLExport MlParser {
                      string filepath) = 0;
   virtual bool Parse(sp<lib_data::MlDataFrame<T>> data,
                      col_array<char> &raw_data) = 0;
+
+  virtual bool Parse(sp<lib_data::MlDataFrame<T>> data,
+                     char* raw_data) = 0;
 };
 }

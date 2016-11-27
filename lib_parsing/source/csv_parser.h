@@ -11,6 +11,7 @@ class CsvParser : public MlParser<T> {
   bool Parse(sp<lib_data::MlDataFrame<T>> data, string filepath) override;
   bool Parse(sp<lib_data::MlDataFrame<T>> data,
              col_array<char>& raw_data) override;
+  bool Parse(sp<lib_data::MlDataFrame<T>> data, char* raw_data) override;
 
  private:
   template <typename Ts>

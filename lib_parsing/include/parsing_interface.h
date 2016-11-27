@@ -14,6 +14,9 @@ class DLLExport ParsingInterface {
                                          col_array<char> &raw_data);
   template <typename T>
   sp<lib_data::MlDataFrame<T>> ParseFile(ParserType type, string filepath);
+  
+  template <typename T>
+  sp<lib_data::MlDataFrame<T>> ParseStream(ParserType type, char* raw_data);
 
  private:
   template <typename T>
