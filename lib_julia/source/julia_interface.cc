@@ -141,7 +141,7 @@ float** experiment_2(char* data1, char* data2, int kNrTrees, int kMaxDepth,
 /*
 Free the data when results have been transferred to julia. 
 */
-float** free_memory(float** data, int rows) {
+void free_memory(float** data, int rows) {
   for (int i = 0; i < rows; ++i) delete[] data[i];
   delete[] data;
 }

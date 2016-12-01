@@ -11,4 +11,4 @@ extern "C" float** experiment_1(char* data, int kNrTrees, int kMaxDepth,
 extern "C" float** experiment_2(char* data1, char* data2, int kNrTrees,
                                 int kMaxDepth, int kAlgoType, bool kBagging);
 
-extern "C" float** free_memory(float** data, int rows);
+extern "C" void free_memory(float** data, int rows);
