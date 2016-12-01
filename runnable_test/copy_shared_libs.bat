@@ -19,6 +19,6 @@ for /F "tokens=2 delims==" %%s in ('set libs[') do if exist ..\%%s\Build_Output\
     xcopy ..\%%s\Build_Output\Libs\MinSizeRel\%%s.dll .\Build_Output\bin\MinSizeRel\ /Y
 )
 
-xcopy F:\APIs\TBB\bin\intel64\vc14\tbb_debug.dll .\Build_Output\bin\Debug\ /Y
-xcopy F:\APIs\TBB\bin\intel64\vc14\tbb.dll .\Build_Output\bin\Release\ /Y
-xcopy F:\APIs\TBB\bin\intel64\vc14\tbb.dll .\Build_Output\bin\MinSizeRel\ /Y
+xcopy D:\API\tbb\bin\intel64\vc14\tbb_debug.dll .\Build_Output\bin\Debug\ /Y
+xcopy D:\API\tbb\bin\intel64\vc14\tbb.dll .\Build_Output\bin\Release\ /Y
+xcopy D:\API\tbb\bin\intel64\vc14\tbb.dll .\Build_Output\bin\MinSizeRel\ /Y
