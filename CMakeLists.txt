@@ -36,6 +36,10 @@ if(WIN32)
 	#-gencode arch=compute_50,code=sm_50;
 	#-gencode arch=compute_60,code=sm_60
 	)
+
+	set(TBB_LIBRARIES
+		${TBB_LIBRARY_DIR}/${TBB_LIBRARY_NAME}
+	)
 else(WIN32)
 	set(TBB_INCLUDE_DIR "/usr/include")
 	set(TBB_LIBRARY_DIR "/usr/lib")
@@ -50,6 +54,10 @@ else(WIN32)
 	-gencode arch=compute_60,code=sm_60;
 	-gencode arch=compute_61,code=sm_61;
 	-std=c++11)
+	
+	set(TBB_LIBRARIES
+		${TBB_LIBRARY_DIR}/libtbb.so
+	)
 endif(WIN32)
 
 set (LIBRARY_OUTPUT_PATH Build_Output/Libs CACHE PATH "Lib path")
