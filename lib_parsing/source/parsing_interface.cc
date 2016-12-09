@@ -1,8 +1,8 @@
 #include "precomp.h"
 
 #include "csv_parser.h"
-#include "lib_data.h"
 #include "lib_core.h"
+#include "lib_data.h"
 #include "parsing_interface.h"
 
 namespace lib_parsing {
@@ -21,14 +21,15 @@ sp<lib_data::MlDataFrame<T>> ParsingInterface::ParseData(
   return data;
 }
 
-  template <typename T>
-  sp<lib_data::MlDataFrame<T>> ParsingInterface::ParseStream(ParserType type, char* raw_data) {
-    auto parser = GetParser<T>(type);
-    auto data = DataLib::GetInstance().CreateDataFrame<T>();
-    if (!parser->Parse(data, raw_data))
-      CoreLib::GetInstance().ThrowException("Parsing failed.");
-    return data;
-  }
+template <typename T>
+sp<lib_data::MlDataFrame<T>> ParsingInterface::ParseStream(ParserType type,
+                                                           char *raw_data) {
+  auto parser = GetParser<T>(type);
+  auto data = DataLib::GetInstance().CreateDataFrame<T>();
+  if (!parser->Parse(data, raw_data))
+    CoreLib::GetInstance().ThrowException("Parsing failed.");
+  return data;
+}
 
 template <typename T>
 sp<lib_data::MlDataFrame<T>> ParsingInterface::ParseFile(ParserType type,
@@ -62,10 +63,8 @@ template DLLExport sp<lib_data::MlDataFrame<float>> ParsingInterface::ParseFile(
     ParserType type, string filepath);
 template DLLExport sp<lib_data::MlDataFrame<double>>
 ParsingInterface::ParseFile(ParserType type, string filepath);
-
-template DLLExport sp<lib_data::MlDataFrame<float>> ParsingInterface::ParseStream(
-    ParserType type, char* filepath);
+template DLLExport sp<lib_data::MlDataFrame<float>>
+ParsingInterface::ParseStream(ParserType type, char *filepath);
 template DLLExport sp<lib_data::MlDataFrame<double>>
-ParsingInterface::ParseStream(ParserType type, char* filepath);
-
+ParsingInterface::ParseStream(ParserType type, char *filepath);
 }

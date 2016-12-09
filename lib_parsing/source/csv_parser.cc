@@ -26,7 +26,8 @@ inline bool CsvParser<T>::Parse(sp<lib_data::MlDataFrame<T>> data,
 }
 
 template <typename T>
-inline bool CsvParser<T>::Parse(sp<lib_data::MlDataFrame<T>> data, char* raw_data) {
+inline bool CsvParser<T>::Parse(sp<lib_data::MlDataFrame<T>> data,
+                                char* raw_data) {
   // if (stream.empty()) return false;
   std::stringstream stream(raw_data);
   return Parse(data, stream);
@@ -94,8 +95,8 @@ inline bool CsvParser<T>::Parse(sp<lib_data::MlDataFrame<T>> data, Ts& stream) {
       } else
         att_col_map[part] = value;
 
-	  if (att_id == target_id)
-		  targets.emplace_back(value);
+      if (att_id == target_id)
+        targets.emplace_back(value);
       else
         samples[att_id].emplace_back(value);
 

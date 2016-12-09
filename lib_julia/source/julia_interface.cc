@@ -17,9 +17,7 @@ float** experiment_1(char* data, int kNrTrees, int kMaxDepth, int kAlgoType,
     auto& ensembles_face = EnsemblesLib::GetInstance();
 
     sp<lib_models::MlModel> model_flt;
-    sp<lib_models::MlModel> model_dbl;
     auto gpurf_flt = ensembles_face.CreateGpuRf<float>();
-    auto gpurf_dbl = ensembles_face.CreateGpuRf<double>();
     auto& parser_face = ParsingLib::GetInstance();
     auto params = ensembles_face.CreateRfParamPack();
 
@@ -35,22 +33,20 @@ float** experiment_1(char* data, int kNrTrees, int kMaxDepth, int kAlgoType,
 
     auto data_fit_raw_flt = parser_face.ParseStream<float>(
         lib_parsing::ParsingInterface::kCsv, data);
-
-    auto data_predict_raw_flt = parser_face.ParseStream<float>(
-        lib_parsing::ParsingInterface::kCsv, data);
+    auto data_predict_raw_flt = data_fit_raw_flt;
 
     model_flt = gpurf_flt->Fit(data_fit_raw_flt, params);
     auto results = gpurf_flt->Predict(data_predict_raw_flt, model_flt, params);
 
-    col_array<col_array<float>> myPredictions = results->GetPredictions_();
-    int rows = myPredictions.size() + 1;
-    int col = myPredictions[0].size();
+    auto myPredictions = results->GetPredictions_();
+    auto rows = myPredictions.size() + 1;
+    auto col = myPredictions[0].size();
 
     myResults = new float*[rows];
 
     myResults[0] = new float[3];
-    myResults[0][0] = rows;
-    myResults[0][1] = col;
+    myResults[0][0] = float(rows);
+    myResults[0][1] = float(col);
     if (kAlgoType == 0) {
       myResults[0][2] =
           results->GetAccuracy(data_predict_raw_flt->GetTargets());
@@ -84,9 +80,7 @@ float** experiment_2(char* data1, char* data2, int kNrTrees, int kMaxDepth,
     auto& ensembles_face = EnsemblesLib::GetInstance();
 
     sp<lib_models::MlModel> model_flt;
-    sp<lib_models::MlModel> model_dbl;
     auto gpurf_flt = ensembles_face.CreateGpuRf<float>();
-    auto gpurf_dbl = ensembles_face.CreateGpuRf<double>();
     auto& parser_face = ParsingLib::GetInstance();
     auto params = ensembles_face.CreateRfParamPack();
 
@@ -109,15 +103,15 @@ float** experiment_2(char* data1, char* data2, int kNrTrees, int kMaxDepth,
     model_flt = gpurf_flt->Fit(data_fit_raw_flt, params);
     auto results = gpurf_flt->Predict(data_predict_raw_flt, model_flt, params);
 
-    col_array<col_array<float>> myPredictions = results->GetPredictions_();
-    int rows = myPredictions.size() + 1;
-    int col = myPredictions[0].size();
+    auto myPredictions = results->GetPredictions_();
+    auto rows = myPredictions.size() + 1;
+    auto col = myPredictions[0].size();
 
     myResults = new float*[rows];
 
     myResults[0] = new float[3];
-    myResults[0][0] = rows;
-    myResults[0][1] = col;
+    myResults[0][0] = float(rows);
+    myResults[0][1] = float(col);
     if (kAlgoType == 0) {
       myResults[0][2] =
           results->GetAccuracy(data_predict_raw_flt->GetTargets());
@@ -139,7 +133,7 @@ float** experiment_2(char* data1, char* data2, int kNrTrees, int kMaxDepth,
 }
 
 /*
-Free the data when results have been transferred to julia. 
+Free the data when results have been transferred to julia.
 */
 void free_memory(float** data, int rows) {
   for (int i = 0; i < rows; ++i) delete[] data[i];
