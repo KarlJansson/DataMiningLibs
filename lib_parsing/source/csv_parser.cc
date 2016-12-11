@@ -81,9 +81,10 @@ inline bool CsvParser<T>::Parse(sp<lib_data::MlDataFrame<T>> data, Ts& stream) {
 
     int att_id = 0;
     while (!lstream.eof()) {
-      auto& att_col_map = attribute_col_map[att_id];
+      auto& att_col_map =
+          attribute_col_map[att_id];
       lstream >> part;
-	  if (lstream.fail()) break;
+      if (lstream.fail()) break;
       std::stringstream pstream(part);
       pstream >> value;
 
@@ -99,8 +100,9 @@ inline bool CsvParser<T>::Parse(sp<lib_data::MlDataFrame<T>> data, Ts& stream) {
 
       if (att_id == target_id)
         targets.emplace_back(value);
-      else
-        samples[att_id].emplace_back(value);
+      else {
+        samples[att_id - (att_id > target_id ? 1 : 0)].emplace_back(value);
+      }
 
       ++att_id;
     }
@@ -115,8 +117,8 @@ inline bool CsvParser<T>::Parse(sp<lib_data::MlDataFrame<T>> data, Ts& stream) {
 
   data->AddTargetData(targets);
   data->AddSampleData(sample_packed);
-  data->AddTargetMap(attribute_col_map.back());
-  attribute_col_map.pop_back();
+  data->AddTargetMap(attribute_col_map[target_id]);
+  attribute_col_map.erase(attribute_col_map.begin() + target_id);
   data->AddFeatureMap(attribute_col_map);
   return true;
 }
