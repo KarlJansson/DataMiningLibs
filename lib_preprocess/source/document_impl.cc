@@ -39,6 +39,8 @@ void DocumentImpl::Parse(T &stream, int target_col) {
   std::copy(std::istream_iterator<string>(linestream),
             std::istream_iterator<string>(),
             std::back_inserter(attribute_names_));
+  for (auto &str : attribute_names_)
+    str.erase(std::remove_if(str.begin(), str.end(), isspace), str.end());
 
   attribute_data_.assign(attribute_names_.size(), col_array<sp<string>>());
   output_values_.assign(attribute_names_.size(), col_array<string>());

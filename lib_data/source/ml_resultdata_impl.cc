@@ -79,11 +79,13 @@ T MlResultDataImpl<T>::GetAccuracy() {
 template <typename T>
 T MlResultDataImpl<T>::GetAuc() {
   col_array<col_map<T, col_array<long long>, std::greater<T>>> rankings;
+  rankings.resize(predictions_[0].size());
   col_array<int> class_marks;
+  class_marks.resize(predictions_[0].size());
   for (int i = 0; i < predictions_.size(); ++i) {
     for (int ii = 0; ii < predictions_[i].size(); ++ii) {
-      rankings[i][predictions_[i][ii]].emplace_back(ii == int(targets_[i]) ? 1
-                                                                           : 0);
+      rankings[ii][predictions_[i][ii]].emplace_back(
+          ii == int(targets_[i]) ? 1 : 0);
       class_marks[int(targets_[i])] = 1;
     }
   }

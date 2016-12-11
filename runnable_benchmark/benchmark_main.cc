@@ -46,6 +46,7 @@ void RunBenchmark(algorithm_map<T>& algos, dataframe_array<T>& dfs_train,
   col_array<T> fit_times;
   col_array<T> pred_times;
   col_array<T> acc_values;
+  col_array<T> auc_values;
   col_array<T> node_counts;
 
   out_stream << "\n"
@@ -86,6 +87,7 @@ void RunBenchmark(algorithm_map<T>& algos, dataframe_array<T>& dfs_train,
         pred_times.push_back(T(elapsed_seconds.count()));
 
         acc_values.push_back(result->GetAccuracy());
+        auc_values.push_back(result->GetAuc());
         node_counts.push_back(
             T(model
                   ->Get<col_array<lib_algorithms::DteAlgorithmShared::
@@ -145,6 +147,32 @@ void RunBenchmark(algorithm_map<T>& algos, dataframe_array<T>& dfs_train,
       for (int i = 0; i < reps; ++i) acc += acc_values[result_id++];
 
       auto str = std::to_string(acc / T(reps));
+      str = str.substr(0, str.find_last_of('.') + 4);
+      if (algo_id < algos.size())
+        out_stream << str << "&	";
+      else
+        out_stream << str << "\\\\";
+      ++algo_id;
+    }
+    out_stream << "\n";
+  }
+
+  out_stream << "\n"
+             << "Auc table:"
+             << "\n"
+             << "		";
+  for (auto& pair : algos) out_stream << pair.first << "&	";
+  out_stream << "\n";
+
+  result_id = 0;
+  for (auto& data_pair : dfs_test) {
+    out_stream << data_pair.first << "&		";
+    auto algo_id = 1;
+    for (auto& pair : algos) {
+      T auc = 0;
+      for (int i = 0; i < reps; ++i) auc += auc_values[result_id++];
+
+      auto str = std::to_string(auc / T(reps));
       str = str.substr(0, str.find_last_of('.') + 4);
       if (algo_id < algos.size())
         out_stream << str << "&	";
