@@ -29,9 +29,9 @@ class TestExport JuliaResources {
   col_umap<int, sutil::any_type> results_;
   col_umap<int, sp<lib_models::MlModel>> models_;
 
-  std::atomic<int> rec_id_ = 0;
+  std::atomic<int> rec_id_;
 
-  JuliaResources() {}
+  JuliaResources() : rec_id_(0){}
   ~JuliaResources() {}
 };
 }
