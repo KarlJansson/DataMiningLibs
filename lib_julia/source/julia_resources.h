@@ -4,7 +4,7 @@
 #include "lib_data.h"
 
 namespace lib_julia {
-class TestExport JuliaResources {
+class JuliaResources {
  public:
   static JuliaResources& get();
 

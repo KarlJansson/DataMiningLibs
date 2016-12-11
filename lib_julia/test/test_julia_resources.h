@@ -1,6 +1,4 @@
 #pragma once
-#include <atomic>
-
 #include "lib_julia.h"
 
 namespace lib_julia {
@@ -10,11 +8,8 @@ char csv_data[] = {
     "4,5,6,7,8,1\ng,1,2,3,4,5,6,7,8,0\nh,1,2,3,4,5,6,7,8,1\ni,1,2,3,4,5,6,7,8,"
     "0"};
 
-auto &julia_face = JuliaResources::get();
-
 TEST(lib_julia, julia_resource_test) {
-  auto data_id = julia_face.SaveDataset<float>(csv_data);
-  auto dataset = julia_face.GetDataset<float>(data_id);
-  julia_face.RemoveDataset(data_id);
+  auto data_id = load_dataset(csv_data);
+  remove_dataset(data_id);
 }
 }

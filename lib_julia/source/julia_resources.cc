@@ -58,21 +58,21 @@ void JuliaResources::RemoveResult(int id) { results_.erase(id); }
 
 sp<lib_models::MlModel> JuliaResources::GetModel(int id) { return models_[id]; }
 
-template TestExport int JuliaResources::SaveDataset<float>(char* dataset);
-template TestExport int JuliaResources::SaveDataset<double>(char* dataset);
+template int JuliaResources::SaveDataset<float>(char* dataset);
+template int JuliaResources::SaveDataset<double>(char* dataset);
 
-template TestExport sp<lib_data::MlDataFrame<float>> JuliaResources::GetDataset(
+template sp<lib_data::MlDataFrame<float>> JuliaResources::GetDataset(
     int id);
-template TestExport sp<lib_data::MlDataFrame<double>>
+template sp<lib_data::MlDataFrame<double>>
 JuliaResources::GetDataset(int id);
 
-template TestExport int JuliaResources::SaveResults(
+template int JuliaResources::SaveResults(
     sp<lib_data::MlResultData<float>> result);
-template TestExport int JuliaResources::SaveResults(
+template int JuliaResources::SaveResults(
     sp<lib_data::MlResultData<double>> result);
 
-template TestExport sp<lib_data::MlResultData<float>> JuliaResources::GetResult(
+template sp<lib_data::MlResultData<float>> JuliaResources::GetResult(
     int id);
-template TestExport sp<lib_data::MlResultData<double>>
+template sp<lib_data::MlResultData<double>>
 JuliaResources::GetResult(int id);
 }
