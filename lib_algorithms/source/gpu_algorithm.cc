@@ -59,6 +59,7 @@ sp<lib_data::MlResultData<T>> GpuAlgorithm<T>::Predict(
   };
   CoreLib::GetInstance().TBBParallelFor(0, dev_count, run_func);
   for (int i = 1; i < results.size(); ++i) *results[0] += *results[i];
+  results[0]->AddTargets(data->GetTargets());
   return results[0];
 }
 

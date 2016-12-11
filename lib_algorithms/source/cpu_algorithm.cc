@@ -30,8 +30,9 @@ sp<lib_data::MlResultData<T>> CpuAlgorithm<T>::Predict(
   auto tree_counter = params->Get<sp<int>>(AlgorithmsLib::kTreeCounter);
   if (*tree_counter == 0)
     *tree_counter = params->Get<int>(AlgorithmsLib::kNrTrees);
-
-  return algorithm_->Predict(data, model, params);
+  auto result = algorithm_->Predict(data, model, params);
+  result->AddTargets(data->GetTargets());
+  return result;
 }
 
 template CpuAlgorithm<float>::CpuAlgorithm(sp<MlAlgorithm<float>> gpu_alg);

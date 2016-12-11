@@ -24,8 +24,7 @@ TEST(lib_ensembles_hybrid_rf, predict_double_rawdata) {
   ASSERT_NO_THROW(
       auto results = hybrid_rf_dbl->Predict(lib_ensembles::data_predict_raw_dbl,
                                             hybrid_rf_model_dbl, params);
-      acc = results->GetAccuracy(
-          lib_ensembles::data_predict_raw_dbl->GetTargets()););
+      acc = results->GetAccuracy(););
   std::cout << "[          ] accuracy = " << acc << std::endl;
 }
 
@@ -40,12 +39,10 @@ TEST(lib_ensembles_hybrid_rf, fit_float_rawdata) {
 TEST(lib_ensembles_hybrid_rf, predict_float_rawdata) {
   auto params = ensembles_face.CreateRfParamPack();
   float acc = 0;
-  ASSERT_NO_THROW(
-      auto results =
-          hybrid_rf_flt->Predict(lib_cuda_algorithms::data_predict_raw_flt,
-                                 hybrid_rf_model_flt, params);
-      acc = results->GetAccuracy(
-          lib_cuda_algorithms::data_predict_raw_flt->GetTargets()););
+  ASSERT_NO_THROW(auto results = hybrid_rf_flt->Predict(
+                      lib_cuda_algorithms::data_predict_raw_flt,
+                      hybrid_rf_model_flt, params);
+                  acc = results->GetAccuracy(););
   std::cout << "[          ] accuracy = " << acc << std::endl;
 }
 
@@ -63,8 +60,7 @@ TEST(lib_ensembles_hybrid_rf, predict_float_csvdata) {
   ASSERT_NO_THROW(auto results =
                       hybrid_rf_flt->Predict(lib_cuda_algorithms::data_csv_flt,
                                              hybrid_rf_model_flt, params);
-                  acc = results->GetAccuracy(
-                      lib_cuda_algorithms::data_csv_flt->GetTargets()););
+                  acc = results->GetAccuracy(););
   std::cout << "[          ] accuracy = " << acc << std::endl;
 }
 
@@ -79,10 +75,9 @@ TEST(lib_ensembles_hybrid_rf, fit_double_csvdata) {
 TEST(lib_ensembles_hybrid_rf, predict_double_csvdata) {
   auto params = ensembles_face.CreateRfParamPack();
   double acc = 0;
-  ASSERT_NO_THROW(
-      auto results = hybrid_rf_dbl->Predict(lib_ensembles::data_csv_dbl,
-                                            hybrid_rf_model_dbl, params);
-      acc = results->GetAccuracy(lib_ensembles::data_csv_dbl->GetTargets()););
+  ASSERT_NO_THROW(auto results = hybrid_rf_dbl->Predict(
+                      lib_ensembles::data_csv_dbl, hybrid_rf_model_dbl, params);
+                  acc = results->GetAccuracy(););
   std::cout << "[          ] accuracy = " << acc << std::endl;
 }
 }

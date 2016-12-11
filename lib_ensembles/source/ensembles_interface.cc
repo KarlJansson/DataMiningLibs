@@ -27,9 +27,9 @@ sp<lib_algorithms::MlAlgorithm<T>> EnsemblesInterface::CreateGpuErt() {
 
 template <typename T>
 sp<lib_algorithms::MlAlgorithm<T>> EnsemblesInterface::CreateHybridRf() {
-	auto gpu_algo = CudaAlgorithmsLib::GetInstance().CreateCudaRf<T>();
-	return AlgorithmsLib::GetInstance().CreateHybridAlgorithm<T>(
-		gpu_algo, CreateCpuRf<T>());
+  auto gpu_algo = CudaAlgorithmsLib::GetInstance().CreateCudaRf<T>();
+  return AlgorithmsLib::GetInstance().CreateHybridAlgorithm<T>(
+      gpu_algo, CreateCpuRf<T>());
 }
 
 template <typename T>

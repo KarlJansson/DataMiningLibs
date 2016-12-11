@@ -82,11 +82,10 @@ void RunBenchmark(algorithm_map<T>& algos, dataframe_array<T>& dfs_train,
         auto result = pair.second.first->Predict(data_pair.second, model,
                                                  pair.second.second);
         end = std::chrono::system_clock::now();
-		elapsed_seconds = end - start;
+        elapsed_seconds = end - start;
         pred_times.push_back(T(elapsed_seconds.count()));
 
-        acc_values.push_back(
-            result->GetAccuracy(data_pair.second->GetTargets()));
+        acc_values.push_back(result->GetAccuracy());
         node_counts.push_back(
             T(model
                   ->Get<col_array<lib_algorithms::DteAlgorithmShared::
@@ -102,7 +101,7 @@ void RunBenchmark(algorithm_map<T>& algos, dataframe_array<T>& dfs_train,
         out_stream << str << "\\\\";
       ++algo_id;
     }
-	out_stream << "\n";
+    out_stream << "\n";
   }
 
   out_stream << "\n"
@@ -215,7 +214,7 @@ void RunBenchmark(algorithm_map<T>& algos, dataframe_array<T>& dfs_train,
         min[3] =
             node_counts[model_id] < min[3] ? node_counts[model_id] : min[3];
 
-		++model_id;
+        ++model_id;
       }
 
       for (int i = 0; i < 4; ++i) {

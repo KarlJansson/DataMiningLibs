@@ -24,8 +24,7 @@ TEST(lib_ensembles_cpurf, predict_double_rawdata) {
   ASSERT_NO_THROW(auto results =
                       cpurf_dbl->Predict(lib_ensembles::data_predict_raw_dbl,
                                          cpurf_model_dbl, params);
-                  acc = results->GetAccuracy(
-                      lib_ensembles::data_predict_raw_dbl->GetTargets()););
+                  acc = results->GetAccuracy(););
   std::cout << "[          ] accuracy = " << acc << std::endl;
 }
 
@@ -43,8 +42,7 @@ TEST(lib_ensembles_cpurf, predict_float_rawdata) {
   ASSERT_NO_THROW(auto results =
                       cpurf_flt->Predict(lib_ensembles::data_predict_raw_flt,
                                          cpurf_model_flt, params);
-                  acc = results->GetAccuracy(
-                      lib_ensembles::data_predict_raw_flt->GetTargets()););
+                  acc = results->GetAccuracy(););
   std::cout << "[          ] accuracy = " << acc << std::endl;
 }
 
@@ -59,10 +57,9 @@ TEST(lib_ensembles_cpurf, fit_float_csvdata) {
 TEST(lib_ensembles_cpurf, predict_float_csvdata) {
   auto params = ensembles_face.CreateRfParamPack();
   float acc = 0;
-  ASSERT_NO_THROW(
-      auto results = cpurf_flt->Predict(lib_ensembles::data_csv_flt,
-                                        cpurf_model_flt, params);
-      acc = results->GetAccuracy(lib_ensembles::data_csv_flt->GetTargets()););
+  ASSERT_NO_THROW(auto results = cpurf_flt->Predict(lib_ensembles::data_csv_flt,
+                                                    cpurf_model_flt, params);
+                  acc = results->GetAccuracy(););
   std::cout << "[          ] accuracy = " << acc << std::endl;
 }
 
@@ -77,10 +74,9 @@ TEST(lib_ensembles_cpurf, fit_double_csvdata) {
 TEST(lib_ensembles_cpurf, predict_double_csvdata) {
   auto params = ensembles_face.CreateRfParamPack();
   double acc = 0;
-  ASSERT_NO_THROW(
-      auto results = cpurf_dbl->Predict(lib_ensembles::data_csv_dbl,
-                                        cpurf_model_dbl, params);
-      acc = results->GetAccuracy(lib_ensembles::data_csv_dbl->GetTargets()););
+  ASSERT_NO_THROW(auto results = cpurf_dbl->Predict(lib_ensembles::data_csv_dbl,
+                                                    cpurf_model_dbl, params);
+                  acc = results->GetAccuracy(););
   std::cout << "[          ] accuracy = " << acc << std::endl;
 }
 }

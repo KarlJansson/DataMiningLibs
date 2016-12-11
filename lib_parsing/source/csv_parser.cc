@@ -26,18 +26,16 @@ inline bool CsvParser<T>::Parse(sp<lib_data::MlDataFrame<T>> data,
 }
 
 template <typename T>
-inline bool CsvParser<T>::Parse(sp<lib_data::MlDataFrame<T>> data,
-                                char* raw_data) {
-  // if (stream.empty()) return false;
-  std::stringstream stream(raw_data);
-  return Parse(data, stream);
-}
-
-template <typename T>
 bool CsvParser<T>::Parse(sp<lib_data::MlDataFrame<T>> data,
                          col_array<char>& raw_data) {
   if (raw_data.empty()) return false;
   std::stringstream stream(raw_data.data());
+  return Parse(data, stream);
+}
+
+template <typename T>
+bool CsvParser<T>::Parse(sp<lib_data::MlDataFrame<T>> data, const char* raw_data) {
+  std::stringstream stream(raw_data);
   return Parse(data, stream);
 }
 
@@ -67,14 +65,17 @@ inline bool CsvParser<T>::Parse(sp<lib_data::MlDataFrame<T>> data, Ts& stream) {
 
   auto target_id = attributes.size() - 1;
   for (int i = 0; i < attributes.size(); ++i)
-    if (attributes[i].compare("class") || attributes[i].compare("target") ||
-        attributes[i].compare("output"))
+    if (attributes[i].compare("class") == 0 ||
+        attributes[i].compare("target") == 0 ||
+        attributes[i].compare("output") == 0 ||
+		attributes[i].compare("regression") == 0)
       target_id = i;
 
   T value;
   string part;
   do {
     std::getline(stream, line);
+	if (line.empty()) break;
     std::stringstream lstream(line);
     lstream.imbue(x);
 
@@ -82,6 +83,7 @@ inline bool CsvParser<T>::Parse(sp<lib_data::MlDataFrame<T>> data, Ts& stream) {
     while (!lstream.eof()) {
       auto& att_col_map = attribute_col_map[att_id];
       lstream >> part;
+	  if (lstream.fail()) break;
       std::stringstream pstream(part);
       pstream >> value;
 

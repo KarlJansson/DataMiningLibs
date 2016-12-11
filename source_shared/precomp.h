@@ -28,6 +28,7 @@
 #include <unordered_map>
 #include <vector>
 #include <chrono>
+#include <locale>
 #ifdef WindowsBuild
 #include <io.h>
 #endif

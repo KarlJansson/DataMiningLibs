@@ -24,8 +24,7 @@ TEST(lib_ensembles_gpurf, predict_double_rawdata) {
   ASSERT_NO_THROW(
       auto results = gpurf_dbl->Predict(
           lib_cuda_algorithms::data_predict_raw_dbl, model_dbl, params);
-      acc = results->GetAccuracy(
-          lib_cuda_algorithms::data_predict_raw_dbl->GetTargets()););
+      acc = results->GetAccuracy(););
   std::cout << "[          ] accuracy = " << acc << std::endl;
 }
 
@@ -43,8 +42,7 @@ TEST(lib_ensembles_gpurf, predict_float_rawdata) {
   ASSERT_NO_THROW(
       auto results = gpurf_flt->Predict(
           lib_cuda_algorithms::data_predict_raw_flt, model_flt, params);
-      acc = results->GetAccuracy(
-          lib_cuda_algorithms::data_predict_raw_flt->GetTargets()););
+      acc = results->GetAccuracy(););
   std::cout << "[          ] accuracy = " << acc << std::endl;
 }
 
@@ -61,8 +59,7 @@ TEST(lib_ensembles_gpurf, predict_float_csvdata) {
   float acc = 0;
   ASSERT_NO_THROW(auto results = gpurf_flt->Predict(
                       lib_cuda_algorithms::data_csv_flt, model_flt, params);
-                  acc = results->GetAccuracy(
-                      lib_cuda_algorithms::data_csv_flt->GetTargets()););
+                  acc = results->GetAccuracy(););
   std::cout << "[          ] accuracy = " << acc << std::endl;
 }
 
@@ -79,8 +76,7 @@ TEST(lib_ensembles_gpurf, predict_double_csvdata) {
   double acc = 0;
   ASSERT_NO_THROW(auto results = gpurf_dbl->Predict(
                       lib_cuda_algorithms::data_csv_dbl, model_dbl, params);
-                  acc = results->GetAccuracy(
-                      lib_cuda_algorithms::data_csv_dbl->GetTargets()););
+                  acc = results->GetAccuracy(););
   std::cout << "[          ] accuracy = " << acc << std::endl;
 }
 }

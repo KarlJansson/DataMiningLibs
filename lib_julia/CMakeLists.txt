@@ -14,20 +14,26 @@ set(dir_list
 	../lib_parsing/include
 	../lib_algorithms/include
 	../lib_ensembles/include
+	../lib_preprocess/include
 )
 
 set(cpp_files
-	./test/test_main_interface.h
+	./test/test_julia_resources.h
 
 	../source_shared/precomp.h
 	./include/lib_julia.h
 	./include/julia_interface.h
+	./source/julia_resources.h
 
+	./source/julia_resources.cc
 	../source_shared/precomp.cc
 	./source/julia_interface.cc
 )
 
 source_group(source FILES
+	./source/julia_resources.h
+
+	./source/julia_resources.cc
 )
 
 source_group(interface FILES
@@ -38,7 +44,7 @@ source_group(interface FILES
 )
 
 source_group(test FILES
-	./test/test_main_interface.h
+	./test/test_julia_resources.h
 )
 
 source_group(precomp FILES
@@ -64,6 +70,7 @@ target_link_libraries(lib_julia
 	lib_core
 	lib_algorithms
 	lib_ensembles
+	lib_preprocess
 )
 
 include_directories(lib_julia

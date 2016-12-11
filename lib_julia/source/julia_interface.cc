@@ -1,141 +1,175 @@
 #include "precomp.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <iostream>
-#include <iterator>
-
 #include "julia_interface.h"
+#include "julia_resources.h"
+#include "lib_algorithms.h"
+#include "lib_data.h"
+#include "lib_ensembles.h"
+#include "lib_models.h"
+#include "lib_parsing.h"
 
-// run on single file
-float** experiment_1(char* data, int kNrTrees, int kMaxDepth, int kAlgoType,
-                     bool kBagging) {
-  float** myResults;
-  try {
-    auto& algorithms_face = AlgorithmsLib::GetInstance();
-    auto& ensembles_face = EnsemblesLib::GetInstance();
-
-    sp<lib_models::MlModel> model_flt;
-    auto gpurf_flt = ensembles_face.CreateGpuRf<float>();
-    auto& parser_face = ParsingLib::GetInstance();
-    auto params = ensembles_face.CreateRfParamPack();
-
-    params->Set(AlgorithmsLib::kNrTrees, kNrTrees);
-    params->Set(AlgorithmsLib::kMaxDepth, kMaxDepth);
-    params->Set(AlgorithmsLib::kBagging, kBagging);
-
-    if (kAlgoType == 0) {
-      params->Set(AlgorithmsLib::kAlgoType, AlgorithmsLib::kClassification);
-    } else if (kAlgoType == 1) {
-      params->Set(AlgorithmsLib::kAlgoType, AlgorithmsLib::kRegression);
-    }
-
-    auto data_fit_raw_flt = parser_face.ParseStream<float>(
-        lib_parsing::ParsingInterface::kCsv, data);
-    auto data_predict_raw_flt = data_fit_raw_flt;
-
-    model_flt = gpurf_flt->Fit(data_fit_raw_flt, params);
-    auto results = gpurf_flt->Predict(data_predict_raw_flt, model_flt, params);
-
-    auto myPredictions = results->GetPredictions_();
-    auto rows = myPredictions.size() + 1;
-    auto col = myPredictions[0].size();
-
-    myResults = new float*[rows];
-
-    myResults[0] = new float[3];
-    myResults[0][0] = float(rows);
-    myResults[0][1] = float(col);
-    if (kAlgoType == 0) {
-      myResults[0][2] =
-          results->GetAccuracy(data_predict_raw_flt->GetTargets());
-    }
-
-    for (int i = 1; i < rows; i++) {
-      myResults[i] = new float[col];
-      for (int j = 0; j < col; j++) {
-        myResults[i][j] = myPredictions[i - 1][j];
-      }
-    }
-
-  } catch (...) {
-    myResults = new float*[1];
-    myResults[0] = new float[1];
-    myResults[0][0] = -1;
-  }
-  return myResults;
+float get_prediction(int result_id, int sample, int target) {
+  auto result = lib_julia::JuliaResources::get().GetResult<float>(result_id);
+  return result->GetPrediction(sample, target);
 }
 
-/**
-run on 2 files
-data1: training file (fit)
-data2: test file (predict)
-*/
-float** experiment_2(char* data1, char* data2, int kNrTrees, int kMaxDepth,
-                     int kAlgoType, bool kBagging) {
-  float** myResults;
-  try {
-    auto& algorithms_face = AlgorithmsLib::GetInstance();
-    auto& ensembles_face = EnsemblesLib::GetInstance();
-
-    sp<lib_models::MlModel> model_flt;
-    auto gpurf_flt = ensembles_face.CreateGpuRf<float>();
-    auto& parser_face = ParsingLib::GetInstance();
-    auto params = ensembles_face.CreateRfParamPack();
-
-    params->Set(AlgorithmsLib::kNrTrees, kNrTrees);
-    params->Set(AlgorithmsLib::kMaxDepth, kMaxDepth);
-    params->Set(AlgorithmsLib::kBagging, kBagging);
-
-    if (kAlgoType == 0) {
-      params->Set(AlgorithmsLib::kAlgoType, AlgorithmsLib::kClassification);
-    } else if (kAlgoType == 1) {
-      params->Set(AlgorithmsLib::kAlgoType, AlgorithmsLib::kRegression);
-    }
-
-    auto data_fit_raw_flt = parser_face.ParseStream<float>(
-        lib_parsing::ParsingInterface::kCsv, data1);
-
-    auto data_predict_raw_flt = parser_face.ParseStream<float>(
-        lib_parsing::ParsingInterface::kCsv, data2);
-
-    model_flt = gpurf_flt->Fit(data_fit_raw_flt, params);
-    auto results = gpurf_flt->Predict(data_predict_raw_flt, model_flt, params);
-
-    auto myPredictions = results->GetPredictions_();
-    auto rows = myPredictions.size() + 1;
-    auto col = myPredictions[0].size();
-
-    myResults = new float*[rows];
-
-    myResults[0] = new float[3];
-    myResults[0][0] = float(rows);
-    myResults[0][1] = float(col);
-    if (kAlgoType == 0) {
-      myResults[0][2] =
-          results->GetAccuracy(data_predict_raw_flt->GetTargets());
-    }
-
-    for (int i = 1; i < rows; i++) {
-      myResults[i] = new float[col];
-      for (int j = 0; j < col; j++) {
-        myResults[i][j] = myPredictions[i - 1][j];
-      }
-    }
-
-  } catch (...) {
-    myResults = new float*[1];
-    myResults[0] = new float[1];
-    myResults[0][0] = -1;
-  }
-  return myResults;
+float get_target(int result_id, int sample) {
+  auto result = lib_julia::JuliaResources::get().GetResult<float>(result_id);
+  return result->GetTarget(sample);
 }
 
-/*
-Free the data when results have been transferred to julia.
-*/
-void free_memory(float** data, int rows) {
-  for (int i = 0; i < rows; ++i) delete[] data[i];
-  delete[] data;
+int get_confusion_matrix(int result_id, int x, int y) {
+  auto result = lib_julia::JuliaResources::get().GetResult<float>(result_id);
+  auto& matrix = result->GetConfusionMatrix();
+  return matrix[x][y];
+}
+
+int get_nr_targets(int result_id) {
+  auto result = lib_julia::JuliaResources::get().GetResult<float>(result_id);
+  return result->GetNrTargets();
+}
+
+int get_nr_samples(int result_id) {
+  auto result = lib_julia::JuliaResources::get().GetResult<float>(result_id);
+  return result->GetNrSamples();
+}
+
+float get_accuracy(int result_id) {
+  auto result = lib_julia::JuliaResources::get().GetResult<float>(result_id);
+  return result->GetAccuracy();
+}
+
+float get_auc(int result_id) {
+  auto result = lib_julia::JuliaResources::get().GetResult<float>(result_id);
+  return result->GetAuc();
+}
+
+float get_mse(int result_id) {
+  auto result = lib_julia::JuliaResources::get().GetResult<float>(result_id);
+  return result->GetMse();
+}
+
+int load_dataset(char* data) {
+  return lib_julia::JuliaResources::get().SaveDataset<float>(data);
+}
+
+int load_model(char* model_path) { return 0; }
+
+void save_model(char* save_path) { return; }
+
+void remove_dataset(int id) {
+  return lib_julia::JuliaResources::get().RemoveDataset(id);
+}
+
+void remove_model(int id) {
+  return lib_julia::JuliaResources::get().RemoveModel(id);
+}
+
+void remove_result(int id) {
+  return lib_julia::JuliaResources::get().RemoveResult(id);
+}
+
+template <typename T>
+int predict(int dataset, int model, bool classification,
+            sp<lib_algorithms::MlAlgorithm<T>> algo,
+            sp<lib_algorithms::MlAlgorithmParams> params) {
+  params->Set(AlgorithmsLib::kAlgoType, classification
+                                            ? AlgorithmsLib::kClassification
+                                            : AlgorithmsLib::kRegression);
+  auto& rec_face = lib_julia::JuliaResources::get();
+  auto data = rec_face.GetDataset<T>(dataset);
+  auto m = rec_face.GetModel(model);
+  auto result = algo->Predict(data, m, params);
+  auto id = rec_face.SaveResults(result);
+  return id;
+}
+
+template <typename T>
+int fit(int dataset, int nr_trees, int max_depth, bool classifiction,
+        sp<lib_algorithms::MlAlgorithm<T>> algo,
+        sp<lib_algorithms::MlAlgorithmParams> params) {
+  params->Set(AlgorithmsLib::kNrTrees, nr_trees);
+  params->Set(AlgorithmsLib::kMaxDepth, max_depth);
+  params->Set(AlgorithmsLib::kAlgoType, classifiction
+                                            ? AlgorithmsLib::kClassification
+                                            : AlgorithmsLib::kRegression);
+
+  auto& rec_face = lib_julia::JuliaResources::get();
+  auto data = rec_face.GetDataset<T>(dataset);
+  auto model = algo->Fit(data, params);
+  return rec_face.SaveModel(model);
+}
+
+int gpurf_fit(int dataset, int nr_trees, int max_depth, bool classification) {
+  auto params = EnsemblesLib::GetInstance().CreateRfParamPack();
+  auto algo = EnsemblesLib::GetInstance().CreateGpuRf<float>();
+  return fit<float>(dataset, nr_trees, max_depth, classification, algo, params);
+}
+
+int gpurf_predict(int dataset, int model, bool classification) {
+  auto params = EnsemblesLib::GetInstance().CreateRfParamPack();
+  auto algo = EnsemblesLib::GetInstance().CreateGpuRf<float>();
+  return predict<float>(dataset, model, classification, algo, params);
+}
+
+int gpuert_fit(int dataset, int nr_trees, int max_depth, bool classification) {
+  auto params = EnsemblesLib::GetInstance().CreateErtParamPack();
+  auto algo = EnsemblesLib::GetInstance().CreateGpuErt<float>();
+  return fit<float>(dataset, nr_trees, max_depth, classification, algo, params);
+}
+
+int gpuert_predict(int dataset, int model, bool classification) {
+  auto params = EnsemblesLib::GetInstance().CreateErtParamPack();
+  auto algo = EnsemblesLib::GetInstance().CreateGpuErt<float>();
+  return predict<float>(dataset, model, classification, algo, params);
+}
+
+int cpurf_fit(int dataset, int nr_trees, int max_depth, bool classification) {
+  auto params = EnsemblesLib::GetInstance().CreateRfParamPack();
+  auto algo = EnsemblesLib::GetInstance().CreateCpuRf<float>();
+  return fit<float>(dataset, nr_trees, max_depth, classification, algo, params);
+}
+
+int cpurf_predict(int dataset, int model, bool classification) {
+  auto params = EnsemblesLib::GetInstance().CreateRfParamPack();
+  auto algo = EnsemblesLib::GetInstance().CreateCpuRf<float>();
+  return predict<float>(dataset, model, classification, algo, params);
+}
+
+int cpuert_fit(int dataset, int nr_trees, int max_depth, bool classification) {
+  auto params = EnsemblesLib::GetInstance().CreateErtParamPack();
+  auto algo = EnsemblesLib::GetInstance().CreateCpuErt<float>();
+  return fit<float>(dataset, nr_trees, max_depth, classification, algo, params);
+}
+
+int cpuert_predict(int dataset, int model, bool classification) {
+  auto params = EnsemblesLib::GetInstance().CreateErtParamPack();
+  auto algo = EnsemblesLib::GetInstance().CreateCpuErt<float>();
+  return predict<float>(dataset, model, classification, algo, params);
+}
+
+int hybridrf_fit(int dataset, int nr_trees, int max_depth,
+                 bool classification) {
+  auto params = EnsemblesLib::GetInstance().CreateRfParamPack();
+  auto algo = EnsemblesLib::GetInstance().CreateHybridRf<float>();
+  return fit<float>(dataset, nr_trees, max_depth, classification, algo, params);
+}
+
+int hybridrf_predict(int dataset, int model, bool classification) {
+  auto params = EnsemblesLib::GetInstance().CreateRfParamPack();
+  auto algo = EnsemblesLib::GetInstance().CreateHybridRf<float>();
+  return predict<float>(dataset, model, classification, algo, params);
+}
+
+int hybridert_fit(int dataset, int nr_trees, int max_depth,
+                  bool classification) {
+  auto params = EnsemblesLib::GetInstance().CreateErtParamPack();
+  auto algo = EnsemblesLib::GetInstance().CreateHybridErt<float>();
+  return fit<float>(dataset, nr_trees, max_depth, classification, algo, params);
+}
+
+int hybridert_predict(int dataset, int model, bool classification) {
+  auto params = EnsemblesLib::GetInstance().CreateErtParamPack();
+  auto algo = EnsemblesLib::GetInstance().CreateHybridErt<float>();
+  return predict<float>(dataset, model, classification, algo, params);
 }

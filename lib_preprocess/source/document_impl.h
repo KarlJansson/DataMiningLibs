@@ -7,13 +7,18 @@ class DocumentImpl : public Document {
   DocumentImpl() = default;
 
   void LoadDocument(string path, int target_col = -1) override;
+  void LoadDocument(char* str_buff, int target_col = -1) override;
   void SaveDocument(string out_path, int split_percent = 100) override;
 
   void NumberfyAttribute(int attribute_id, bool force_replace = false) override;
   void NominolizeAttribute(int attribute_id) override;
   void TargetifyAttribute(int attribute_id) override;
+  std::stringstream GetModifiedString() override;
 
  private:
+  template <typename T>
+  void Parse(T& stream, int target_col);
+
   class document_ctype : public std::ctype<char> {
     mask my_table[table_size];
 

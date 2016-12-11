@@ -5,22 +5,33 @@
 
 namespace lib_preprocess {
 void DocumentImpl::LoadDocument(string path, int target_col) {
+  std::ifstream open(path);
+  if (open.fail()) {
+    open.close();
+    CoreLib::GetInstance().ThrowException("File not found: " + path);
+  }
+  if (open.eof()) CoreLib::GetInstance().ThrowException("Empty file: " + path);
+
+  Parse(open, target_col);
+  open.close();
+}
+
+void DocumentImpl::LoadDocument(char *str_buff, int target_col) {
+  std::stringstream open(str_buff);
+  Parse(open, target_col);
+}
+
+template <typename T>
+void DocumentImpl::Parse(T &stream, int target_col) {
   attribute_unique_values_.clear();
   attribute_names_.clear();
   attribute_values_.clear();
   attribute_data_.clear();
   output_values_.clear();
 
-  std::ifstream open(path);
-  if (open.fail()) {
-    open.close();
-    CoreLib::GetInstance().ThrowException("File not found: " + path);
-  }
-
   std::locale read_settings(std::locale::classic(), new document_ctype);
   string line;
-  std::getline(open, line);
-  if (open.eof()) CoreLib::GetInstance().ThrowException("Empty file: " + path);
+  std::getline(stream, line);
 
   std::stringstream linestream(line);
   linestream.imbue(read_settings);
@@ -33,14 +44,18 @@ void DocumentImpl::LoadDocument(string path, int target_col) {
   output_values_.assign(attribute_names_.size(), col_array<string>());
   attribute_unique_values_.assign(attribute_names_.size(),
                                   col_map<string, int>());
+  std::locale loc;
+  for (auto &str : attribute_names_)
+    for (auto &e : str) e = std::tolower(e, loc);
   nr_features_ = int(attribute_names_.size());
 
   target_col_ = target_col;
   if (target_col_ == -1)
     for (int i = 0; i < attribute_names_.size(); ++i)
-      if (attribute_names_[i].compare("class") ||
-          attribute_names_[i].compare("target") ||
-          attribute_names_[i].compare("output"))
+      if (attribute_names_[i].compare("class") == 0 ||
+          attribute_names_[i].compare("target") == 0 ||
+          attribute_names_[i].compare("output") == 0 ||
+		  attribute_names_[i].compare("regression") == 0)
         target_col_ = i;
   if (target_col_ < 0 || target_col_ >= attribute_names_.size())
     target_col_ = int(attribute_names_.size() - 1);
@@ -48,13 +63,15 @@ void DocumentImpl::LoadDocument(string path, int target_col) {
   string part;
   nr_samples_ = 0;
   do {
-    std::getline(open, line);
+    std::getline(stream, line);
+	if (line.empty()) break;
     std::stringstream lstream(line);
     lstream.imbue(read_settings);
 
     int att_id = 0;
     while (!lstream.eof()) {
       lstream >> part;
+	  if (lstream.fail()) break;
       part.erase(std::remove_if(part.begin(), part.end(), isspace), part.end());
 
       auto itr = attribute_values_.find(part);
@@ -71,9 +88,7 @@ void DocumentImpl::LoadDocument(string path, int target_col) {
     if (att_id != attribute_names_.size())
       CoreLib::GetInstance().ThrowException("Missing attribute in instance");
     ++nr_samples_;
-  } while (!open.eof());
-
-  open.close();
+  } while (!stream.eof());
 }
 
 void DocumentImpl::SaveDocument(string out_path, int split_percent) {
@@ -160,5 +175,32 @@ void DocumentImpl::TargetifyAttribute(int attribute_id) {
 
   if (attribute_unique_values_[attribute_id].size() < 20)
     NumberfyAttribute(attribute_id, true);
+}
+
+std::stringstream DocumentImpl::GetModifiedString() {
+  auto &target_map = attribute_unique_values_[target_col_];
+  auto target_cpy = target_map;
+  for (auto &pair : target_cpy) pair.second = 0;
+  auto offset_map = target_cpy;
+
+  std::stringstream content;
+  for (int i = 0; i < attribute_names_.size() - 1; ++i)
+    content << attribute_names_[i] << ",";
+  content << attribute_names_[attribute_names_.size() - 1];
+  content << std::endl;
+
+  for (int i = 0; i < nr_samples_; ++i) {
+    for (int ii = 0; ii < attribute_data_.size(); ++ii) {
+      if (output_values_[ii].empty())
+        content << *attribute_data_[ii][i];
+      else
+        content << output_values_[ii][i];
+      if (ii < attribute_data_.size() - 1) content << ",";
+    }
+
+    content << std::endl;
+  }
+
+  return content;
 }
 }

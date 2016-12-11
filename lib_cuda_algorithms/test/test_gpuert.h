@@ -21,11 +21,10 @@ TEST(lib_ensembles_gpuert, fit_double_rawdata) {
 TEST(lib_ensembles_gpuert, predict_double_rawdata) {
   auto params = ensembles_face.CreateErtParamPack();
   double acc = 0;
-  ASSERT_NO_THROW(auto results =
-                      gpuert_dbl->Predict(lib_cuda_algorithms::data_predict_raw_dbl,
-                                          gpuert_model_dbl, params);
-                  acc = results->GetAccuracy(
-					  lib_cuda_algorithms::data_predict_raw_dbl->GetTargets()););
+  ASSERT_NO_THROW(
+      auto results = gpuert_dbl->Predict(
+          lib_cuda_algorithms::data_predict_raw_dbl, gpuert_model_dbl, params);
+      acc = results->GetAccuracy(););
   std::cout << "[          ] accuracy = " << acc << std::endl;
 }
 
@@ -34,17 +33,16 @@ TEST(lib_ensembles_gpuert, fit_float_rawdata) {
   params->Set(AlgorithmsLib::kNrTrees, 100);
   params->Set(AlgorithmsLib::kAlgoType, AlgorithmsLib::kClassification);
   ASSERT_NO_THROW(gpuert_model_flt = gpuert_flt->Fit(
-	  lib_cuda_algorithms::data_fit_raw_flt, params););
+                      lib_cuda_algorithms::data_fit_raw_flt, params););
 }
 
 TEST(lib_ensembles_gpuert, predict_float_rawdata) {
   auto params = ensembles_face.CreateErtParamPack();
   float acc = 0;
-  ASSERT_NO_THROW(auto results =
-                      gpuert_flt->Predict(lib_cuda_algorithms::data_predict_raw_flt,
-                                          gpuert_model_flt, params);
-                  acc = results->GetAccuracy(
-					  lib_cuda_algorithms::data_predict_raw_flt->GetTargets()););
+  ASSERT_NO_THROW(
+      auto results = gpuert_flt->Predict(
+          lib_cuda_algorithms::data_predict_raw_flt, gpuert_model_flt, params);
+      acc = results->GetAccuracy(););
   std::cout << "[          ] accuracy = " << acc << std::endl;
 }
 
@@ -52,17 +50,17 @@ TEST(lib_ensembles_gpuert, fit_float_csvdata) {
   auto params = ensembles_face.CreateErtParamPack();
   params->Set(AlgorithmsLib::kNrTrees, 100);
   params->Set(AlgorithmsLib::kAlgoType, AlgorithmsLib::kClassification);
-  ASSERT_NO_THROW(gpuert_model_flt =
-                      gpuert_flt->Fit(lib_cuda_algorithms::data_csv_flt, params););
+  ASSERT_NO_THROW(gpuert_model_flt = gpuert_flt->Fit(
+                      lib_cuda_algorithms::data_csv_flt, params););
 }
 
 TEST(lib_ensembles_gpuert, predict_float_csvdata) {
   auto params = ensembles_face.CreateErtParamPack();
   float acc = 0;
-  ASSERT_NO_THROW(
-      auto results = gpuert_flt->Predict(lib_cuda_algorithms::data_csv_flt,
-                                         gpuert_model_flt, params);
-      acc = results->GetAccuracy(lib_cuda_algorithms::data_csv_flt->GetTargets()););
+  ASSERT_NO_THROW(auto results =
+                      gpuert_flt->Predict(lib_cuda_algorithms::data_csv_flt,
+                                          gpuert_model_flt, params);
+                  acc = results->GetAccuracy(););
   std::cout << "[          ] accuracy = " << acc << std::endl;
 }
 
@@ -70,17 +68,17 @@ TEST(lib_ensembles_gpuert, fit_double_csvdata) {
   auto params = ensembles_face.CreateErtParamPack();
   params->Set(AlgorithmsLib::kNrTrees, 100);
   params->Set(AlgorithmsLib::kAlgoType, AlgorithmsLib::kClassification);
-  ASSERT_NO_THROW(gpuert_model_dbl =
-                      gpuert_dbl->Fit(lib_cuda_algorithms::data_csv_dbl, params););
+  ASSERT_NO_THROW(gpuert_model_dbl = gpuert_dbl->Fit(
+                      lib_cuda_algorithms::data_csv_dbl, params););
 }
 
 TEST(lib_ensembles_gpuert, predict_double_csvdata) {
   auto params = ensembles_face.CreateErtParamPack();
   double acc = 0;
-  ASSERT_NO_THROW(
-      auto results = gpuert_dbl->Predict(lib_cuda_algorithms::data_csv_dbl,
-                                         gpuert_model_dbl, params);
-      acc = results->GetAccuracy(lib_cuda_algorithms::data_csv_dbl->GetTargets()););
+  ASSERT_NO_THROW(auto results =
+                      gpuert_dbl->Predict(lib_cuda_algorithms::data_csv_dbl,
+                                          gpuert_model_dbl, params);
+                  acc = results->GetAccuracy(););
   std::cout << "[          ] accuracy = " << acc << std::endl;
 }
 }
