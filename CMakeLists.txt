@@ -38,8 +38,8 @@ if(WIN32)
 	)
 
 	set(TBB_LIBRARIES
-		optimized ${TBB_LIBRARY_DIR}/${TBB_LIBRARY_NAME}
-		debug ${TBB_LIBRARY_DIR}/${TBB_LIBRARY_NAME}_debug
+		optimized ${TBB_LIBRARY_DIR}/tbb${TBB_LIBRARY_NAME}
+		debug ${TBB_LIBRARY_DIR}/tbb_debug${TBB_LIBRARY_NAME}
 	)
 else(WIN32)
 	set(TBB_INCLUDE_DIR "/usr/include")
