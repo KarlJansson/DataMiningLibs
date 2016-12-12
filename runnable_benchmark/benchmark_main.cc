@@ -306,13 +306,13 @@ algorithm_map<T> CreateAlgorithms(col_map<string, sutil::any_type>& settings) {
     }
   }
 
-  result["CpuErt"] = algorithm_pair<T>(ens_lib.CreateCpuErt<T>(), ert_par);
-  result["CpuRf"] = algorithm_pair<T>(ens_lib.CreateCpuRf<T>(), rf_par);
+  result["0_CpuErt"] = algorithm_pair<T>(ens_lib.CreateCpuErt<T>(), ert_par);
+  result["3_CpuRf"] = algorithm_pair<T>(ens_lib.CreateCpuRf<T>(), rf_par);
 #ifdef Cuda_Found
-  result["GpuErt"] = algorithm_pair<T>(ens_lib.CreateGpuErt<T>(), ert_par);
-  result["GpuRf"] = algorithm_pair<T>(ens_lib.CreateGpuRf<T>(), rf_par);
-  result["HybErt"] = algorithm_pair<T>(ens_lib.CreateHybridErt<T>(), ert_par);
-  result["HybRf"] = algorithm_pair<T>(ens_lib.CreateHybridRf<T>(), rf_par);
+  result["1_GpuErt"] = algorithm_pair<T>(ens_lib.CreateGpuErt<T>(), ert_par);
+  result["4_GpuRf"] = algorithm_pair<T>(ens_lib.CreateGpuRf<T>(), rf_par);
+  result["2_HybErt"] = algorithm_pair<T>(ens_lib.CreateHybridErt<T>(), ert_par);
+  result["5_HybRf"] = algorithm_pair<T>(ens_lib.CreateHybridRf<T>(), rf_par);
 #endif
 
   return result;
