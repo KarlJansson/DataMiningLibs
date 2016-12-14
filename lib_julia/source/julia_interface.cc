@@ -50,12 +50,16 @@ float get_mse(int result_id) {
 }
 
 int load_dataset(char* data) {
-  return lib_julia::JuliaResources::get().SaveDataset<float>(data);
+  return lib_julia::JuliaResources::get().StoreDataset<float>(data);
 }
 
-int load_model(char* model_path) { return 0; }
+int load_model(char* model_path) {
+  return lib_julia::JuliaResources::get().LoadModel<float>(model_path);
+}
 
-void save_model(char* save_path) { return; }
+void save_model(int model_id, char* save_path) {
+  lib_julia::JuliaResources::get().SaveModel<float>(model_id, save_path);
+}
 
 void remove_dataset(int id) {
   return lib_julia::JuliaResources::get().RemoveDataset(id);
@@ -80,7 +84,7 @@ int predict(int dataset, int model, bool classification,
   auto data = rec_face.GetDataset<T>(dataset);
   auto m = rec_face.GetModel(model);
   auto result = algo->Predict(data, m, params);
-  auto id = rec_face.SaveResults(result);
+  auto id = rec_face.StoreResults(result);
   return id;
 }
 
@@ -97,7 +101,7 @@ int fit(int dataset, int nr_trees, int max_depth, bool classifiction,
   auto& rec_face = lib_julia::JuliaResources::get();
   auto data = rec_face.GetDataset<T>(dataset);
   auto model = algo->Fit(data, params);
-  return rec_face.SaveModel(model);
+  return rec_face.StoreModel(model);
 }
 
 int gpurf_fit(int dataset, int nr_trees, int max_depth, bool classification) {

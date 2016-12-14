@@ -52,11 +52,13 @@ TEST(lib_ensembles_cpuert, fit_float_csvdata) {
   params->Set(AlgorithmsLib::kAlgoType, AlgorithmsLib::kClassification);
   ASSERT_NO_THROW(cpuert_model_flt =
                       cpuert_flt->Fit(lib_ensembles::data_csv_flt, params););
+  cpuert_model_flt->SaveModel("./save_test.model");
 }
 
 TEST(lib_ensembles_cpuert, predict_float_csvdata) {
   auto params = ensembles_face.CreateErtParamPack();
   float acc = 0;
+  cpuert_model_flt->LoadModel("./save_test.model");
   ASSERT_NO_THROW(auto results = cpuert_flt->Predict(
                       lib_ensembles::data_csv_flt, cpuert_model_flt, params);
                   acc = results->GetAccuracy(););

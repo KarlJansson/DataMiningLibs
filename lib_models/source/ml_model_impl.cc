@@ -23,4 +23,12 @@ void MlModelImpl::Aggregate(col_array<sp<lib_models::MlModel>> models) {
 col_array<sp<lib_models::MlModel>> MlModelImpl::Split(const int parts) {
   return decorator_->SplitModel(shared_from_this(), parts);
 }
+
+void MlModelImpl::SaModel(string save_path) {
+  decorator_->SaveModel(save_path, shared_from_this());
+}
+
+void MlModelImpl::LdModel(string model_path) {
+  decorator_->LoadModel(model_path, shared_from_this());
+}
 }

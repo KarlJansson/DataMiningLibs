@@ -156,6 +156,59 @@ col_array<sp<lib_models::MlModel>> DteModelDecorator<T>::SplitModel(
   return models;
 }
 
+template <typename T>
+void DteModelDecorator<T>::SaveModel(string save_path,
+                                     sp<lib_models::MlModel> model) {
+  auto& node_array = model->Get<col_array<
+      lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Classify<T>>>(
+      ModelsLib::kNodeArray);
+  auto& prob_array = model->Get<col_array<T>>(ModelsLib::kProbArray);
+  auto nr_trees = model->Get<int>(ModelsLib::kNrTrees);
+  auto nr_targets = model->Get<int>(ModelsLib::kNrTargets);
+  auto nr_features = model->Get<int>(ModelsLib::kNrFeatures);
+  auto model_type = model->Get<AlgorithmsLib::AlgorithmType>(ModelsLib::kModelType);
+
+  std::ofstream open(save_path, std::ios::binary);
+  open.write((char*)&nr_trees, sizeof(nr_trees));
+  open.write((char*)&nr_targets, sizeof(nr_targets));
+  open.write((char*)&nr_features, sizeof(nr_features));
+  open.write((char*)&model_type, sizeof(model_type));
+  auto node_size = node_array.size();
+  open.write((char*)&node_size, sizeof(node_size));
+  if (node_size > 0) open.write((char*)node_array.data(), sizeof(node_array[0]));
+  auto prob_size = prob_array.size();
+  open.write((char*)&prob_size, sizeof(prob_size));
+  if (prob_size > 0) open.write((char*)prob_array.data(), sizeof(prob_array[0]));
+  open.close();
+}
+
+template <typename T>
+void DteModelDecorator<T>::LoadModel(string model_path,
+                                     sp<lib_models::MlModel> model) {
+  int nr_trees = 0;
+  int nr_targets = 0;
+  int nr_features = 0;
+  AlgorithmsLib::AlgorithmType model_type;
+  col_array<lib_algorithms::DteAlgorithmShared::Dte_NodeHeader_Classify<T>>
+      node_array;
+  col_array<T> prob_array;
+
+  std::ifstream open(model_path, std::ios::binary);
+  open.read((char*)&nr_trees, sizeof(nr_trees));
+  open.read((char*)&nr_targets, sizeof(nr_targets));
+  open.read((char*)&nr_features, sizeof(nr_features));
+  open.read((char*)&model_type, sizeof(model_type));
+  auto node_size = 0;
+  open.read((char*)&node_size, sizeof(node_size));
+  node_array.resize(node_size);
+  if (node_size > 0) open.read((char*)node_array.data(), sizeof(node_array[0]));
+  auto prob_size = 0;
+  open.read((char*)&prob_size, sizeof(prob_size));
+  prob_array.resize(prob_size);
+  if (prob_size > 0) open.read((char*)prob_array.data(), sizeof(prob_array[0]));
+  open.close();
+}
+
 template DteModelDecorator<float>::DteModelDecorator();
 template DteModelDecorator<double>::DteModelDecorator();
 }

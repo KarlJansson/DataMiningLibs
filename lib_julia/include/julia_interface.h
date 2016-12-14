@@ -18,7 +18,7 @@ DLLExport float get_mse(int result_id);
 */
 DLLExport int load_dataset(char* data);
 DLLExport int load_model(char* model_path);
-DLLExport void save_model(char* save_path);
+DLLExport void save_model(int model_id, char* save_path);
 
 DLLExport void remove_dataset(int id);
 DLLExport void remove_model(int id);

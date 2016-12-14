@@ -14,6 +14,8 @@ class MlModelImpl : public MlModel,
   sutil::any_type& GetData(const int id) override;
   void Aggregate(col_array<sp<lib_models::MlModel>> models) override;
   col_array<sp<lib_models::MlModel>> Split(const int parts) override;
+  void SaModel(string save_path) override;
+  void LdModel(string model_path) override;
 
   col_array<sutil::any_type> data_;
   sp<MlModelDecorator> decorator_;

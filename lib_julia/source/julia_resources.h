@@ -9,14 +9,19 @@ class JuliaResources {
   static JuliaResources& get();
 
   template <typename T>
-  int SaveDataset(char* dataset);
+  int StoreDataset(char* dataset);
   template <typename T>
-  int SaveResults(sp<lib_data::MlResultData<T>> result);
-  int SaveModel(sp<lib_models::MlModel> model);
+  int StoreResults(sp<lib_data::MlResultData<T>> result);
+  int StoreModel(sp<lib_models::MlModel> model);
 
   void RemoveDataset(int id);
   void RemoveModel(int id);
   void RemoveResult(int id);
+
+  template <typename T>
+  void SaveModel(int model_id, string save_path);
+  template <typename T>
+  int LoadModel(string model_path);
 
   template <typename T>
   sp<lib_data::MlDataFrame<T>> GetDataset(int id);
