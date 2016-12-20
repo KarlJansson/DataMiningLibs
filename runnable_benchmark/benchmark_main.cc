@@ -56,8 +56,8 @@ void RunBenchmark(algorithm_map<T>& algos, dataframe_array<T>& dfs_train,
   for (auto& pair : algos) out_stream << pair.first << "&	";
   out_stream << "\n";
 
-  for (auto& data_pair : dfs_train) {
-    out_stream << data_pair.first << "&		";
+  for (int i = 0; i < dfs_train.size(); ++i) {
+    out_stream << dfs_train[i].first << "&		";
     auto algo_id = 1;
     for (auto& pair : algos) {
       T fit_time = 0;
@@ -65,22 +65,22 @@ void RunBenchmark(algorithm_map<T>& algos, dataframe_array<T>& dfs_train,
         // Warmup round
         if (i == 0) {
           auto model =
-              pair.second.first->Fit(data_pair.second, pair.second.second);
-          auto result = pair.second.first->Predict(data_pair.second, model,
+              pair.second.first->Fit(dfs_train[i].second, pair.second.second);
+          auto result = pair.second.first->Predict(dfs_test[i].second, model,
                                                    pair.second.second);
           continue;
         }
 
         start = std::chrono::system_clock::now();
         auto model =
-            pair.second.first->Fit(data_pair.second, pair.second.second);
+            pair.second.first->Fit(dfs_train[i].second, pair.second.second);
         end = std::chrono::system_clock::now();
         elapsed_seconds = end - start;
         fit_times.push_back(T(elapsed_seconds.count()));
         fit_time += fit_times.back();
 
         start = std::chrono::system_clock::now();
-        auto result = pair.second.first->Predict(data_pair.second, model,
+        auto result = pair.second.first->Predict(dfs_test[i].second, model,
                                                  pair.second.second);
         end = std::chrono::system_clock::now();
         elapsed_seconds = end - start;
