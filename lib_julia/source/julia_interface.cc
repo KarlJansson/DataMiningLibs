@@ -80,12 +80,16 @@ int predict(int dataset, int model, bool classification,
   params->Set(AlgorithmsLib::kAlgoType, classification
                                             ? AlgorithmsLib::kClassification
                                             : AlgorithmsLib::kRegression);
-  auto& rec_face = lib_julia::JuliaResources::get();
-  auto data = rec_face.GetDataset<T>(dataset);
-  auto m = rec_face.GetModel(model);
-  auto result = algo->Predict(data, m, params);
-  auto id = rec_face.StoreResults(result);
-  return id;
+  try {
+    auto& rec_face = lib_julia::JuliaResources::get();
+    auto data = rec_face.GetDataset<T>(dataset);
+    auto m = rec_face.GetModel(model);
+    auto result = algo->Predict(data, m, params);
+    auto id = rec_face.StoreResults(result);
+    return id;
+  } catch (...) {
+    return -1;
+  }
 }
 
 template <typename T>
@@ -97,11 +101,14 @@ int fit(int dataset, int nr_trees, int max_depth, bool classifiction,
   params->Set(AlgorithmsLib::kAlgoType, classifiction
                                             ? AlgorithmsLib::kClassification
                                             : AlgorithmsLib::kRegression);
-
-  auto& rec_face = lib_julia::JuliaResources::get();
-  auto data = rec_face.GetDataset<T>(dataset);
-  auto model = algo->Fit(data, params);
-  return rec_face.StoreModel(model);
+  try {
+    auto& rec_face = lib_julia::JuliaResources::get();
+    auto data = rec_face.GetDataset<T>(dataset);
+    auto model = algo->Fit(data, params);
+    return rec_face.StoreModel(model);
+  } catch (...) {
+    return -1;
+  }
 }
 
 int gpurf_fit(int dataset, int nr_trees, int max_depth, bool classification) {
