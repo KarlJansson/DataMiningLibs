@@ -77,9 +77,10 @@ template <typename T>
 int predict(int dataset, int model, bool classification,
             sp<lib_algorithms::MlAlgorithm<T>> algo,
             sp<lib_algorithms::MlAlgorithmParams> params) {
-  params->Set(AlgorithmsLib::kAlgoType, classification
-                                            ? AlgorithmsLib::kClassification
-                                            : AlgorithmsLib::kRegression);
+  if (dataset == -1 || model == -1) return -1;
+  params->Set(AlgorithmsLib::kAlgoType,
+              classification ? AlgorithmsLib::kClassification
+                             : AlgorithmsLib::kRegression);
   try {
     auto& rec_face = lib_julia::JuliaResources::get();
     auto data = rec_face.GetDataset<T>(dataset);
@@ -96,11 +97,12 @@ template <typename T>
 int fit(int dataset, int nr_trees, int max_depth, bool classifiction,
         sp<lib_algorithms::MlAlgorithm<T>> algo,
         sp<lib_algorithms::MlAlgorithmParams> params) {
+  if (dataset == -1) return -1;
   params->Set(AlgorithmsLib::kNrTrees, nr_trees);
   params->Set(AlgorithmsLib::kMaxDepth, max_depth);
-  params->Set(AlgorithmsLib::kAlgoType, classifiction
-                                            ? AlgorithmsLib::kClassification
-                                            : AlgorithmsLib::kRegression);
+  params->Set(AlgorithmsLib::kAlgoType,
+              classifiction ? AlgorithmsLib::kClassification
+                            : AlgorithmsLib::kRegression);
   try {
     auto& rec_face = lib_julia::JuliaResources::get();
     auto data = rec_face.GetDataset<T>(dataset);

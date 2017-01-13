@@ -11,20 +11,24 @@ JuliaResources& JuliaResources::get() {
 
 template <typename T>
 int JuliaResources::StoreDataset(char* dataset) {
-  auto& parse_face = ParsingLib::GetInstance();
-  auto& preprocess = PreprocessLib::GetInstance();
-  int id = ++rec_id_;
-  auto preprocess_doc = preprocess.CreatePreprocessDocument();
-  preprocess_doc->LoadDocument(dataset);
-  for (int i = 0; i < preprocess_doc->NrFeatures(); ++i)
-    if (i == preprocess_doc->TargetCol())
-      preprocess_doc->TargetifyAttribute(i);
-    else
-      preprocess_doc->NumberfyAttribute(i);
-  auto buff = preprocess_doc->GetModifiedString();
-  auto dframe = parse_face.ParseData<T>(ParsingLib::kCsv, buff.str().c_str());
-  dataframes_[id] = sutil::any_type(dframe);
-  return id;
+  try {
+    auto& parse_face = ParsingLib::GetInstance();
+    auto& preprocess = PreprocessLib::GetInstance();
+    int id = ++rec_id_;
+    auto preprocess_doc = preprocess.CreatePreprocessDocument();
+    preprocess_doc->LoadDocument(dataset);
+    for (int i = 0; i < preprocess_doc->NrFeatures(); ++i)
+      if (i == preprocess_doc->TargetCol())
+        preprocess_doc->TargetifyAttribute(i);
+      else
+        preprocess_doc->NumberfyAttribute(i);
+    auto buff = preprocess_doc->GetModifiedString();
+    auto dframe = parse_face.ParseData<T>(ParsingLib::kCsv, buff.str().c_str());
+    dataframes_[id] = sutil::any_type(dframe);
+    return id;
+  } catch (...) {
+    return -1;
+  }
 }
 
 template <typename T>
@@ -74,20 +78,16 @@ sp<lib_models::MlModel> JuliaResources::GetModel(int id) { return models_[id]; }
 template int JuliaResources::StoreDataset<float>(char* dataset);
 template int JuliaResources::StoreDataset<double>(char* dataset);
 
-template sp<lib_data::MlDataFrame<float>> JuliaResources::GetDataset(
-    int id);
-template sp<lib_data::MlDataFrame<double>>
-JuliaResources::GetDataset(int id);
+template sp<lib_data::MlDataFrame<float>> JuliaResources::GetDataset(int id);
+template sp<lib_data::MlDataFrame<double>> JuliaResources::GetDataset(int id);
 
 template int JuliaResources::StoreResults(
     sp<lib_data::MlResultData<float>> result);
 template int JuliaResources::StoreResults(
     sp<lib_data::MlResultData<double>> result);
 
-template sp<lib_data::MlResultData<float>> JuliaResources::GetResult(
-    int id);
-template sp<lib_data::MlResultData<double>>
-JuliaResources::GetResult(int id);
+template sp<lib_data::MlResultData<float>> JuliaResources::GetResult(int id);
+template sp<lib_data::MlResultData<double>> JuliaResources::GetResult(int id);
 
 template void JuliaResources::SaveModel<float>(int model_id, string save_path);
 template void JuliaResources::SaveModel<double>(int model_id, string save_path);
